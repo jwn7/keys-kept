@@ -71,7 +71,7 @@ export const useApp = create<AppState>((set, get) => {
       if (e.locked) app.scheduler.stop();
       else {
         void app.session.purgeExpiredTrash(); // 휴지통 30일 정리 (SPEC §3.1)
-        if (app.backendKind === 'drive') app.scheduler.start();
+        if (app.backendKind !== 'memory') app.scheduler.start();
       }
     }
   });
@@ -88,7 +88,7 @@ export const useApp = create<AppState>((set, get) => {
     locked: true,
     notes: [],
     trash: [],
-    status: app.backendKind === 'drive' ? { state: 'offline', pending: 0 } : { state: 'synced', at: '' },
+    status: app.backendKind !== 'memory' ? { state: 'offline', pending: 0 } : { state: 'synced', at: '' },
     selectedId: null,
     filter: { kind: 'all' },
     query: '',
@@ -122,7 +122,7 @@ export const useApp = create<AppState>((set, get) => {
 export async function bootApp(): Promise<void> {
   const { app, setScreen } = useApp.getState();
   const has = await app.session.hasLocalKeys();
-  if (!has && app.backendKind === 'drive') {
+  if (!has && app.backendKind !== 'memory') {
     // Drive에 연결된 새 기기: 백엔드에서 키를 받아올 수 있는지 unlock이 판단한다.
     setScreen('unlock');
     return;

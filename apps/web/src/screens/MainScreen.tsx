@@ -71,7 +71,7 @@ export function useNoteActions() {
       app.session.lock();
     },
     async syncNow() {
-      if (app.backendKind === 'drive') await app.session.sync();
+      if (app.backendKind !== 'memory') await app.session.sync();
     },
   };
 }
@@ -115,7 +115,7 @@ export function MainScreen() {
       <header className="topbar">
         <div className="left">
           <span className="logo desktop-only" style={{ fontSize: 17 }}>{ko.app.name}</span>
-          <StatusBadge status={status} local={app.backendKind !== 'drive'} />
+          <StatusBadge status={status} local={app.backendKind === 'memory'} />
         </div>
         <div className="right">
           <button type="button" className="search-btn" onClick={() => setPalette(true)} aria-label={ko.main.search}>

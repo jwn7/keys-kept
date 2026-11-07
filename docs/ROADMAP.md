@@ -51,7 +51,7 @@
 - [ ] `supabase/migrations/0001_init.sql` 적용, RLS 테스트 — `0002_put_item.sql`(원자적 version 비교), `0003_backups_bucket.sql` 추가. `supabase start`로 적용·검증은 미실행
 - [x] Edge Function `backup-mail` (Resend, 40MB 체크, Storage 링크 대체) — 코드만, 배포·실발송 미검증
 - [ ] pg_cron 주간 트리거 → 클라이언트에 "백업 요청" 푸시 (서버는 age 파일을 만들 수 없으므로 클라이언트가 생성)
-- [ ] Play 결제 구독, 첨부파일(Storage 청크 암호화)
+- [ ] Play 결제 구독, 첨부파일(Storage 청크 암호화) — 앱의 Pro 전환(Supabase Google 로그인 → 백엔드 교체 → Realtime)은 구현됨, 결제는 미구현
 - [ ] Tauri 데스크톱 패키징, iOS
 
 ## 하지 않기로 한 것

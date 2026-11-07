@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { backupFileName, exportBackup, exportObsidianZip, obsidianZipName, parseMarkdownFiles, WrongPasswordError } from '@vault/core';
 import { useApp } from '../app/store';
 import { GisDriveAuth } from '../app/driveAuth';
 import { GOOGLE_CLIENT_ID, setDeviceName } from '../app/session';
+import { proAvailable, proSessionEmail, proSignIn, proSignOut, setProEnabled } from '../pro/supabase';
 import { ko } from '../i18n/ko';
 import { downloadBytes, passwordScore, pickDirectoryFiles, relTime, shareOrDownload } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
@@ -45,6 +46,38 @@ function SyncSection() {
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState(app.deviceName);
   const connected = app.backendKind === 'drive';
+  const pro = app.backendKind === 'supabase';
+  const [proEmail, setProEmail] = useState<string | null>(null);
+  useEffect(() => {
+    if (!proAvailable()) return;
+    void proSessionEmail().then((email) => {
+      setProEmail(email);
+      // 로그인 리다이렉트에서 돌아와 세션이 생겼으면 Pro 백엔드로 전환
+      if (email && !pro && sessionStorage.getItem('vault.pro.pending') === '1') {
+        sessionStorage.removeItem('vault.pro.pending');
+        setProEnabled(true);
+        window.location.reload();
+      }
+    });
+  }, [pro]);
+  const upgrade = async () => {
+    if (!proAvailable()) {
+      window.alert(S.sync.comingSoon);
+      return;
+    }
+    if (proEmail) {
+      setProEnabled(true);
+      window.location.reload();
+      return;
+    }
+    sessionStorage.setItem('vault.pro.pending', '1');
+    await proSignIn();
+  };
+  const proOff = async () => {
+    if (!window.confirm(S.sync.proDisconnectConfirm)) return;
+    await proSignOut();
+    window.location.reload();
+  };
 
   const connect = async () => {
     if (!app.driveAuth) return;
@@ -98,7 +131,14 @@ function SyncSection() {
             <span className="small muted" style={{ fontWeight: 400 }}>{S.sync.proPrice}</span>
           </div>
           <div style={{ color: 'var(--ink-2)' }}>{S.sync.proDesc}</div>
-          <button type="button" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={() => window.alert(S.sync.comingSoon)}>{S.sync.upgrade}</button>
+          {pro ? (
+            <div className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <StatusBadge status={status} local={false} /> {proEmail ?? ''}
+              <button type="button" className="btn-link muted" onClick={() => void proOff()}>{S.sync.proDisconnect}</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={() => void upgrade()}>{S.sync.upgrade}</button>
+          )}
         </div>
       </div>
       <div className="sees">

@@ -1,8 +1,9 @@
 import { DriveBackend, LocalStore, MemoryBackend, SyncScheduler, VaultSession, type SyncBackend } from '@vault/core';
 import { GisDriveAuth } from './driveAuth';
+import { createSupabaseBackend, proEnabled } from '../pro/supabase';
 
 /**
- * 앱 전체가 잡는 단 하나의 핸들. 백엔드 선택(Drive/로컬 전용)은 여기서만 안다.
+ * 앱 전체가 잡는 단 하나의 핸들. 백엔드 선택(Supabase Pro / Drive / 로컬 전용)은 여기서만 안다.
  * UI는 session과 scheduler만 쓰고 어느 백엔드인지 모른다 (규칙 4).
  */
 export type AppSession = {
@@ -63,7 +64,11 @@ export function createAppSession(): AppSession {
   const store = new LocalStore('vault');
   const useDrive = GOOGLE_CLIENT_ID !== '' && GisDriveAuth.isConnected();
   const driveAuth = GOOGLE_CLIENT_ID ? new GisDriveAuth(GOOGLE_CLIENT_ID) : null;
-  const backend: SyncBackend = useDrive && driveAuth ? new DriveBackend({ auth: driveAuth }) : new MemoryBackend();
+  const backend: SyncBackend = proEnabled()
+    ? createSupabaseBackend()
+    : useDrive && driveAuth
+      ? new DriveBackend({ auth: driveAuth })
+      : new MemoryBackend();
   const session = new VaultSession({
     store,
     backend,

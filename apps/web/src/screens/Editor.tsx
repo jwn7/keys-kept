@@ -55,7 +55,7 @@ export function Editor() {
     const saved = await app.session.save({ id: n.id, title: t, body, tags: mergeTags(n, body) });
     setSavedAt(saved.updatedAt);
     setSaveState('saved');
-    if (app.backendKind === 'drive') app.scheduler.requestNow();
+    if (app.backendKind !== 'memory') app.scheduler.requestNow();
   };
   const titleRef = useRef('');
   titleRef.current = title;

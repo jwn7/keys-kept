@@ -52,7 +52,7 @@ export function CommandPalette() {
       { id: 'settings', kind: 'cmd', label: ko.palette.cmd.settings, run: () => setScreen('settings') },
       { id: 'lock', kind: 'cmd', label: ko.palette.cmd.lock, key: 'Ctrl L', run: () => actions.lock() },
     ];
-    const cmds = all.filter((c) => (c.id !== 'sync' || app.backendKind === 'drive') && (!needle || c.label.toLowerCase().includes(needle)));
+    const cmds = all.filter((c) => (c.id !== 'sync' || app.backendKind !== 'memory') && (!needle || c.label.toLowerCase().includes(needle)));
     return [...noteItems, ...cmds];
   }, [q, notes, app.backendKind]); // actions/select/setScreen은 안정적
 

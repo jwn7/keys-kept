@@ -4,7 +4,7 @@
 PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세 스펙은 `docs/`에 있다 — **코드를 쓰기 전에 `docs/SPEC.md`와 `docs/DATA-MODEL.md`를 읽는다.**
 
 ## 현재 상태
-- 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 85개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro 코어(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
+- 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 94개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
 - 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
 
 ## 절대 규칙 (바꾸려면 사용자에게 먼저 확인)
