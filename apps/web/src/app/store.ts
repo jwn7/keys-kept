@@ -69,7 +69,10 @@ export const useApp = create<AppState>((set, get) => {
       const screen = e.locked ? 'unlock' : get().screen === 'setup' ? 'setup' : 'main';
       set({ ...pull(), screen, selectedId: e.locked ? null : get().selectedId, paletteOpen: false });
       if (e.locked) app.scheduler.stop();
-      else if (app.backendKind === 'drive') app.scheduler.start();
+      else {
+        void app.session.purgeExpiredTrash(); // 휴지통 30일 정리 (SPEC §3.1)
+        if (app.backendKind === 'drive') app.scheduler.start();
+      }
     }
   });
   let last: string | null = null;

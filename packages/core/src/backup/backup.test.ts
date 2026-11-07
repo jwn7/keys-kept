@@ -32,9 +32,15 @@ const note = (over: Partial<Note>): Note => ({
 
 const FAST = { scryptWorkFactor: 10 }; // 테스트용. 실제는 기본값(18)
 
-function hasAgeCli(): boolean {
+/**
+ * age는 패스프레이즈를 stdin이 아니라 TTY에서 읽는다. TTY 없는 환경에선 영원히 기다리므로
+ * Linux/macOS(CI)에서는 `script`로 가짜 TTY를 만들어 돌리고, Windows에서는 건너뛴다.
+ */
+function canRunAgeCli(): boolean {
+  if (process.platform === 'win32') return false;
   try {
     execFileSync('age', ['--version'], { stdio: 'ignore' });
+    execFileSync('script', ['--version'], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -75,14 +81,15 @@ describe('age 백업', () => {
     expect(backupFileName(new Date('2026-11-09T03:00:00Z'))).toBe('vault-2026-11-09.age');
   });
 
-  it.skipIf(!hasAgeCli())('실제 age CLI(age -d)로 복호화돼야 한다 (CI 기준)', async () => {
+  it.skipIf(!canRunAgeCli())('실제 age CLI(age -d)로 복호화돼야 한다 (CI 기준)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'vault-age-'));
     try {
       const bytes = await exportBackup([note({ title: 'cli' })], 'cli-pw', 'dev'); // 기본 work factor
       const p = join(dir, 'b.age');
       writeFileSync(p, bytes);
       const out = join(dir, 'b.json');
-      execFileSync('age', ['-d', '-o', out, p], { env: { ...process.env, AGE_PASSPHRASE: 'cli-pw' }, input: 'cli-pw\n', stdio: ['pipe', 'ignore', 'ignore'] });
+      // script(1)가 pty를 제공하고, 우리가 stdin으로 넣은 패스프레이즈가 그 pty로 전달된다.
+      execFileSync('script', ['-qec', `age -d -o '${out}' '${p}'`, '/dev/null'], { input: 'cli-pw\n', stdio: ['pipe', 'ignore', 'ignore'], timeout: 30_000 });
       const parsed = JSON.parse(readFileSync(out, 'utf8')) as { format: string; notes: Note[] };
       expect(parsed.format).toBe('vault-backup');
       expect(parsed.notes[0]?.title).toBe('cli');

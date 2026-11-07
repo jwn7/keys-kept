@@ -151,6 +151,29 @@ describe('VaultSession', () => {
     expect((await backend.getKeys())[0]).toEqual(keyBefore);
   });
 
+  it('purgeExpiredTrash: 30일 지난 휴지통 메모는 내용을 비우고 tombstone만 남긴다', async () => {
+    const s = make();
+    await s.setup('pw');
+    const old = await s.save({ title: '오래된 삭제', body: '비밀' });
+    const fresh = await s.save({ title: '최근 삭제', body: '아직' });
+    await s.delete(old.id);
+    await s.delete(fresh.id);
+    expect(s.listDeleted()).toHaveLength(2);
+    // 29일 뒤: 아무것도 안 비움
+    expect(await s.purgeExpiredTrash(Date.now() + 29 * 86_400_000)).toBe(0);
+    // old만 31일 전에 삭제된 것처럼: deletedAt을 과거로 둔 사본을 병합
+    const oldDeleted = s.listDeleted().find((n) => n.id === old.id)!;
+    await s.mergeNotes([{ ...oldDeleted, deletedAt: null, updatedAt: '2999-01-01T00:00:00.000Z' }]);
+    await s.delete(old.id);
+    const n = await s.purgeExpiredTrash(Date.now() + 31 * 86_400_000);
+    expect(n).toBe(2); // 둘 다 31일 지남
+    expect(s.listDeleted()).toHaveLength(0); // 내용이 빈 tombstone은 휴지통 목록에서 빠진다
+    const blob = await store.getBlob(old.id);
+    expect(blob?.deletedAt).not.toBeNull();
+    expect(JSON.stringify(await store.allBlobs())).not.toContain('비밀');
+    expect((await store.outbox()).filter((e) => e.op === 'delete')).toHaveLength(2);
+  });
+
   it('복구 문구로 unlockWithRecovery → 메모 복원', async () => {
     const s = make();
     const { recoveryPhrase } = await s.setup('pw');

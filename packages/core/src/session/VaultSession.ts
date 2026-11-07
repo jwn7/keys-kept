@@ -296,6 +296,24 @@ export class VaultSession {
     this.emit({ type: 'notes' });
   }
 
+  /**
+   * 휴지통 30일 정리 (SPEC §3.1): deletedAt이 days 이전인 메모는 내용을 비우고 tombstone만 남긴다.
+   * 비운 tombstone은 새 버전으로 동기화되어 다른 기기에서도 내용이 사라진다. 돌려주는 값: 비운 개수.
+   */
+  async purgeExpiredTrash(now = Date.now(), days = 30): Promise<number> {
+    this.requireUnlocked();
+    const cutoff = now - days * 86_400_000;
+    let n = 0;
+    for (const note of [...this.notes.values()]) {
+      if (note.deletedAt === null || new Date(note.deletedAt).getTime() > cutoff) continue;
+      if (note.title === '' && note.body === '' && note.tags.length === 0) continue;
+      await this.persist({ ...note, title: '', body: '', tags: [], folder: null, pinned: false, updatedAt: new Date().toISOString() }, 'delete');
+      n++;
+    }
+    if (n) this.emit({ type: 'notes' });
+    return n;
+  }
+
   /** 휴지통에서 복원. */
   async restore(id: string): Promise<void> {
     this.requireUnlocked();
