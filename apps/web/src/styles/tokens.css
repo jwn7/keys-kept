@@ -1,0 +1,28 @@
+/* docs/DESIGN.md 토큰을 그대로 옮긴 것. 바꾸면 문서도 같이 바꾼다. */
+:root {
+  --paper: #F7F4EE;
+  --surface: #FFFFFF;
+  --surface-2: #FBFAF7;
+  --ink: #1B1A17;
+  --ink-2: #4A463F;
+  --muted: #6B675F;
+  --line: #E3DED4;
+  --line-2: #ECE8DF;
+  --line-strong: #C9C3B8;
+  --accent: #A8372B;
+  --accent-soft: #F6E7E3;
+  --ok: #2F6B4F;
+  --warn: #8A5A12;
+  --danger: #8A2A20;
+  --radius-s: 8px; --radius-m: 10px; --radius-l: 16px;
+  --font-sans: 'Noto Sans KR', system-ui, sans-serif;
+  --font-serif: 'Noto Serif KR', serif;
+}
+[data-theme="dark"] {
+  --paper: #171614; --surface: #1F1E1B; --surface-2: #1A1917;
+  --ink: #EDE9E1; --ink-2: #C9C4B9; --muted: #9A958B;
+  --line: #2E2C28; --line-2: #262421; --line-strong: #4A463F;
+  --accent: #D4655A; --accent-soft: #3A2320;
+  --ok: #6FB08F; --warn: #D9A04A; --danger: #E07068;
+}
+body { margin: 0; background: var(--paper); color: var(--ink); }

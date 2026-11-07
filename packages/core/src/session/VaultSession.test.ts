@@ -1,0 +1,162 @@
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ready } from '../crypto/sodium';
+import { LocalStore } from '../store/LocalStore';
+import { MemoryBackend } from '../sync/MemoryBackend';
+import { LockedError, VaultSession, WrongPasswordError } from './VaultSession';
+import { fastKdfParams } from '../test/params';
+
+beforeAll(ready);
+
+const tick = () => new Promise((r) => setTimeout(r, 2));
+
+describe('VaultSession', () => {
+  let store: LocalStore;
+  let backend: MemoryBackend;
+  const make = (s = store, b = backend, deviceId = 'pc-1') =>
+    new VaultSession({ store: s, backend: b, deviceId, kdfParams: fastKdfParams });
+
+  beforeEach(() => {
+    store = new LocalStore(`session-${Math.random()}`);
+    backend = new MemoryBackend();
+  });
+  afterEach(async () => {
+    await store.destroy();
+  });
+
+  it('setup → 복구키 12단어, 백엔드에 ItemsKeyRecord 1개, 로컬 meta에도 복사', async () => {
+    const s = make();
+    const { recoveryPhrase } = await s.setup('correct horse battery staple');
+    expect(recoveryPhrase).toHaveLength(12);
+    const keys = await backend.getKeys();
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatchObject({ protocol: 1, kdf: { alg: 'argon2id' }, kdfRecovery: { alg: 'argon2id' } });
+    expect(keys[0]?.wrappedKey).not.toBe(keys[0]?.wrappedKeyRecovery);
+    expect(s.isLocked).toBe(false);
+    expect(await store.getMeta('itemsKeyRecord')).toEqual(keys[0]);
+  });
+
+  it('save → list, 암호문만 blobs에, outbox에 put 1개', async () => {
+    const s = make();
+    await s.setup('pw');
+    const note = await s.save({ title: '첫 메모', body: '안녕 #인사' });
+    expect(note.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(note.tags).toEqual(['인사']);
+    expect(s.list().map((n) => n.id)).toEqual([note.id]);
+
+    const blobs = await store.allBlobs();
+    expect(blobs).toHaveLength(1);
+    expect(JSON.stringify(blobs)).not.toContain('첫 메모');
+    expect(blobs[0]?.version).toBe(1);
+    expect((await store.outbox()).map((e) => e.op)).toEqual(['put']);
+  });
+
+  it('두 번 save → version 2, updatedAt 증가, versions 기록 2개', async () => {
+    const s = make();
+    await s.setup('pw');
+    const a = await s.save({ title: 'v1', body: '' });
+    await tick();
+    const b = await s.save({ id: a.id, title: 'v2', body: '' });
+    expect(b.updatedAt > a.updatedAt).toBe(true);
+    expect(b.createdAt).toBe(a.createdAt);
+    expect((await store.getBlob(a.id))?.version).toBe(2);
+    expect((await store.versions(a.id)).map((v) => v.version)).toEqual([2, 1]);
+    expect(s.get(a.id)?.title).toBe('v2');
+  });
+
+  it('lock → list/get/save 불가, unlock(비밀번호) → 같은 메모 복원', async () => {
+    const s = make();
+    await s.setup('pw');
+    const n = await s.save({ title: '잠금 테스트', body: 'body' });
+    s.lock();
+    expect(s.isLocked).toBe(true);
+    expect(() => s.list()).toThrow(LockedError);
+    await expect(s.save({ title: 'x', body: '' })).rejects.toThrow(LockedError);
+
+    await s.unlock('pw');
+    expect(s.list()).toHaveLength(1);
+    expect(s.get(n.id)).toEqual(n);
+  });
+
+  it('틀린 비밀번호 → WrongPasswordError, 잠금 유지', async () => {
+    const s = make();
+    await s.setup('pw');
+    s.lock();
+    await expect(s.unlock('nope')).rejects.toThrow(WrongPasswordError);
+    expect(s.isLocked).toBe(true);
+  });
+
+  it('새 기기: 빈 로컬 + 같은 백엔드 → 백엔드 keys로 unlock', async () => {
+    const s1 = make();
+    await s1.setup('pw');
+    await s1.save({ title: '기기1', body: '' });
+
+    const store2 = new LocalStore(`session2-${Math.random()}`);
+    const s2 = make(store2, backend, 'phone-1');
+    await s2.unlock('pw'); // meta 없음 → backend.getKeys()
+    expect(s2.isLocked).toBe(false);
+    expect(s2.list()).toHaveLength(0); // 블롭 동기화는 2단계
+    expect(await store2.getMeta('itemsKeyRecord')).toBeDefined();
+    await store2.destroy();
+  });
+
+  it('delete → tombstone: list에서 빠지고 blob은 deletedAt 설정, outbox delete', async () => {
+    const s = make();
+    await s.setup('pw');
+    const n = await s.save({ title: '지울 것', body: '' });
+    await s.delete(n.id);
+    expect(s.list()).toHaveLength(0);
+    const b = await store.getBlob(n.id);
+    expect(b?.deletedAt).not.toBeNull();
+    expect(b?.version).toBe(2);
+    expect((await store.outbox()).map((e) => e.op)).toEqual(['delete']);
+  });
+
+  it('list 정렬: 핀 먼저, 그다음 updatedAt 내림차순', async () => {
+    const s = make();
+    await s.setup('pw');
+    const a = await s.save({ title: 'a', body: '' });
+    await tick();
+    const b = await s.save({ title: 'b', body: '' });
+    await tick();
+    await s.save({ id: a.id, title: 'a', body: '', pinned: true });
+    expect(s.list().map((n) => n.title)).toEqual(['a', 'b']);
+    expect(b.pinned).toBe(false);
+  });
+
+  it('changePassword: wrappedKey만 바뀌고 blobs는 그대로, 새 비밀번호로 unlock', async () => {
+    const s = make();
+    await s.setup('old');
+    const n = await s.save({ title: '유지', body: '' });
+    const before = (await store.allBlobs())[0];
+    const keyBefore = (await backend.getKeys())[0];
+
+    await s.changePassword('old', 'new');
+    const keyAfter = (await backend.getKeys())[0];
+    expect(keyAfter?.id).toBe(keyBefore?.id);
+    expect(keyAfter?.wrappedKey).not.toBe(keyBefore?.wrappedKey);
+    expect(keyAfter?.wrappedKeyRecovery).toBe(keyBefore?.wrappedKeyRecovery);
+    expect((await store.allBlobs())[0]).toEqual(before);
+
+    s.lock();
+    await expect(s.unlock('old')).rejects.toThrow(WrongPasswordError);
+    await s.unlock('new');
+    expect(s.get(n.id)?.title).toBe('유지');
+  });
+
+  it('changePassword: 현재 비밀번호가 틀리면 WrongPasswordError, 키 레코드 불변', async () => {
+    const s = make();
+    await s.setup('old');
+    const keyBefore = (await backend.getKeys())[0];
+    await expect(s.changePassword('wrong', 'new')).rejects.toThrow(WrongPasswordError);
+    expect((await backend.getKeys())[0]).toEqual(keyBefore);
+  });
+
+  it('복구 문구로 unlockWithRecovery → 메모 복원', async () => {
+    const s = make();
+    const { recoveryPhrase } = await s.setup('pw');
+    const n = await s.save({ title: '복구', body: '' });
+    s.lock();
+    await s.unlockWithRecovery(recoveryPhrase);
+    expect(s.get(n.id)?.title).toBe('복구');
+  });
+});

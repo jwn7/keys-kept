@@ -1,0 +1,10 @@
+export type * from './model/types';
+export { ready } from './crypto/sodium';
+export { DecryptError } from './crypto/errors';
+export { InvalidRecoveryPhraseError } from './crypto/keys';
+export { LocalStore } from './store/LocalStore';
+export type { OutboxEntry, VersionEntry, MetaKey, MetaMap } from './store/LocalStore';
+export { type SyncBackend, ConflictError, OfflineError } from './sync/SyncBackend';
+export { MemoryBackend } from './sync/MemoryBackend';
+export { VaultSession, LockedError, WrongPasswordError, NotSetUpError, extractTags } from './session/VaultSession';
+export type { VaultSessionOptions, NoteInput } from './session/VaultSession';
