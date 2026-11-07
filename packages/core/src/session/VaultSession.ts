@@ -299,6 +299,27 @@ export class VaultSession {
     this.emit({ type: 'notes' });
   }
 
+  /**
+   * 백업 복구·마크다운 가져오기 병합 (SPEC §4): id 같으면 updatedAt 큰 쪽, 없으면 추가.
+   * 로컬이 더 최신이면 건너뛴다(백업본은 versions에 남지 않지만 사용자가 가진 파일이므로 손실이 아니다).
+   */
+  async mergeNotes(incoming: Note[]): Promise<{ added: number; updated: number; skipped: number }> {
+    this.requireUnlocked();
+    const r = { added: 0, updated: 0, skipped: 0 };
+    for (const n of incoming) {
+      const local = this.notes.get(n.id);
+      if (local && local.updatedAt >= n.updatedAt) {
+        r.skipped++;
+        continue;
+      }
+      await this.persist({ ...n, deletedAt: null, updatedAt: new Date().toISOString() }, 'put');
+      if (local) r.updated++;
+      else r.added++;
+    }
+    if (r.added + r.updated) this.emit({ type: 'notes' });
+    return r;
+  }
+
   /** 과거 버전(암호문)을 복호화해 돌려준다. 최신순. */
   async history(id: string): Promise<{ version: number; savedAt: string; note: Note }[]> {
     const itemsKey = this.requireUnlocked();
