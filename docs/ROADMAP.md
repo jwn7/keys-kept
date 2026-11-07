@@ -18,10 +18,10 @@
 
 ## 2단계 — 동기화 엔진 (주말 1~2)
 - [x] `sync/SyncBackend.ts` 인터페이스 + `MemoryBackend`
-- [ ] `sync/SyncEngine.ts` pull/push/충돌 사본/tombstone/outbox
-- [ ] 두 기기 시뮬레이션 테스트 6종 (ARCHITECTURE.md 테스트 전략)
-- [ ] `sync/drive/DriveBackend.ts` — OAuth PKCE(`drive.file`), 폴더 생성, list(since)/get/put
-- [ ] 폴링 스케줄러 (포커스 + 30초)
+- [x] `sync/SyncEngine.ts` pull/push/충돌 사본/tombstone/outbox
+- [x] 두 기기 시뮬레이션 테스트 6종 (ARCHITECTURE.md 테스트 전략)
+- [x] `sync/drive/DriveBackend.ts` — OAuth PKCE(`drive.file`), 폴더 생성, list(since)/get/put
+- [x] 폴링 스케줄러 (포커스 + 30초)
 
 ## 3단계 — PWA UI (주말 2)
 - [ ] 잠금 해제 / 첫 실행(비밀번호·복구키) 화면

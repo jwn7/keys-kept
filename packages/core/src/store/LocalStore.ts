@@ -3,7 +3,8 @@ import type { EncryptedItem, ItemsKeyRecord } from '../model/types';
 
 export type OutboxOp = 'put' | 'delete';
 export type OutboxEntry = { id: string; op: OutboxOp; queuedAt: string; seq: number };
-export type VersionEntry = { noteId: string; version: number; item: EncryptedItem; savedAt: string };
+/** seq: 자동 증가 기본키. version 번호는 기기마다 따로 올라가므로 (noteId, version)만으로는 유일하지 않다. */
+export type VersionEntry = { seq?: number; noteId: string; version: number; item: EncryptedItem; savedAt: string };
 
 /** DATA-MODEL.md §로컬 meta 키. 값 타입은 키마다 다르다. */
 export type MetaMap = {
@@ -26,7 +27,7 @@ export class LocalStore {
   private readonly db: Dexie & {
     blobs: EntityTable<EncryptedItem, 'id'>;
     outbox: EntityTable<OutboxEntry, 'id'>;
-    versions: Table<VersionEntry, [string, number]>; // 복합 키 [noteId+version]
+    versions: Table<VersionEntry, number>;
     meta: EntityTable<MetaRow, 'key'>;
   };
 
@@ -35,7 +36,7 @@ export class LocalStore {
     this.db.version(1).stores({
       blobs: 'id, updatedAt',
       outbox: 'id, seq',
-      versions: '[noteId+version], noteId',
+      versions: '++seq, noteId',
       meta: 'key',
     });
   }
@@ -74,18 +75,18 @@ export class LocalStore {
   // ---- versions (로컬 전용, 최근 20개) ----
   async pushVersion(item: EncryptedItem): Promise<void> {
     await this.db.transaction('rw', this.db.versions, async () => {
-      await this.db.versions.put({ noteId: item.id, version: item.version, item, savedAt: new Date().toISOString() });
+      await this.db.versions.add({ noteId: item.id, version: item.version, item, savedAt: new Date().toISOString() });
       const keys = await this.db.versions.where('noteId').equals(item.id).primaryKeys();
       if (keys.length > VERSIONS_KEEP) {
-        const sorted = [...keys].sort((a, b) => a[1] - b[1]);
+        const sorted = [...keys].sort((a, b) => a - b);
         await this.db.versions.bulkDelete(sorted.slice(0, keys.length - VERSIONS_KEEP));
       }
     });
   }
-  /** 최신 버전부터. */
+  /** 최신(마지막에 기록된 것)부터. */
   async versions(noteId: string): Promise<VersionEntry[]> {
     const rows = await this.db.versions.where('noteId').equals(noteId).toArray();
-    return rows.sort((a, b) => b.version - a.version);
+    return rows.sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0));
   }
 
   // ---- meta ----
