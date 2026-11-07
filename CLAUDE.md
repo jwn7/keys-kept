@@ -1,0 +1,45 @@
+# Vault — Claude Code 작업 지침
+
+제로-널리지 암호화 메모 앱. 메모는 기기 안에서만 열리고, 서버(Google Drive / Supabase)와 메일함에는 암호문만 간다.
+PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세 스펙은 `docs/`에 있다 — **코드를 쓰기 전에 `docs/SPEC.md`와 `docs/DATA-MODEL.md`를 읽는다.**
+
+## 현재 상태
+- 0단계(뼈대)·1단계(암호화 코어) 완료. `packages/core`에 crypto/store/session + 테스트 53개. 다음은 `docs/ROADMAP.md` 2단계(동기화 엔진).
+- 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
+
+## 절대 규칙 (바꾸려면 사용자에게 먼저 확인)
+1. **암호화 원시 함수를 직접 구현하지 않는다.** `libsodium-wrappers-sumo`만 쓴다. Argon2id = `crypto_pwhash`, 항목 암호화 = `crypto_aead_xchacha20poly1305_ietf_*`.
+2. **서버로 나가는 모든 바이트는 `packages/core/src/sync/` 를 통과하고, 그 전에 `crypto/`로 암호화돼 있어야 한다.** 평문 제목·본문·태그·폴더명이 네트워크 계층에 닿으면 버그다.
+3. root key(비밀번호에서 유도한 키)는 PC에서는 메모리에만 둔다. 디스크·localStorage·IndexedDB에 쓰지 않는다. 모바일(Tauri/Capacitor)에서만 OS 키체인에 저장하고 생체인증으로 꺼낸다.
+4. 동기화 백엔드는 `SyncBackend` 인터페이스(`packages/core/src/sync/SyncBackend.ts`)로만 접근한다. Google Drive가 기본, Supabase는 Pro 옵션. UI는 어느 백엔드인지 몰라야 한다.
+5. 삭제는 tombstone(`deletedAt`)이다. 물리 삭제는 "계정 삭제" 흐름에서만.
+6. 충돌은 LWW(`updatedAt` 큰 쪽 채택) + 진 쪽을 "충돌 사본" 메모로 보존한다. 데이터를 조용히 버리지 않는다.
+7. 백업 파일은 **age 포맷**(`age-encryption` 패키지, 패스프레이즈 모드)이다. 자체 포맷을 만들지 않는다. `age -d`로 풀리는지가 테스트 기준.
+8. 런타임 의존성은 최소로: `libsodium-wrappers-sumo`, `age-encryption`, `dexie`, `@supabase/supabase-js`(Pro 모듈에서만), React. 새 런타임 의존성은 이유를 적고 추가한다.
+9. 테스트 먼저. `packages/core`는 UI 없이 Vitest로 100% 돌아가야 한다. 암호화 라운드트립, 동기화 충돌, 백업 복구는 필수 테스트.
+10. 한국어 UI 문구는 `apps/web/src/i18n/ko.ts` 한 곳에 둔다.
+
+## 모노레포 구조
+```
+packages/core      암호화 · 로컬 저장 · 동기화 엔진 · 백업 (UI 없음, 브라우저/Node 공용)
+apps/web           React + Vite PWA (PC와 모바일 브라우저)
+apps/desktop       Tauri 2 래퍼 (2단계) — apps/web을 그대로 감쌈
+apps/mobile        Tauri 2 Android/iOS (3단계)
+supabase/          Pro 백엔드: 마이그레이션, RLS, Edge Function(backup-mail)
+docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
+```
+
+## 명령
+- `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
+- `pnpm --filter web dev` (localhost:5173)
+- `supabase start` / `supabase db reset` (Pro 모듈 작업 시)
+
+## 작업 순서 (새 기능)
+1. `docs/SPEC.md`에서 해당 항목 확인, 없으면 먼저 스펙에 한 줄 추가
+2. `packages/core`에 테스트 작성 → 구현 → `pnpm -r test`
+3. UI 연결 (`apps/web`)
+4. `docs/ROADMAP.md`의 체크박스 갱신
+
+## 하지 않는 것
+- 서버 측 검색, 공유 링크, 실시간 공동편집, 서버 AI 요약 — 제로-널리지와 충돌. 요청이 와도 구현하지 말고 이유를 설명한다.
+- Supabase Vault / pgsodium 컬럼 암호화 — 서버가 복호화할 수 있어 무의미.
