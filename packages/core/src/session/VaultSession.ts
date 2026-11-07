@@ -142,6 +142,12 @@ export class VaultSession {
     return { recoveryPhrase: phrase };
   }
 
+  /** 잠긴 상태에서도 알 수 있는 것(평문 아님): 암호문 개수, 마지막 동기화 시각. 잠금 화면 안내용. */
+  async lockedStats(): Promise<{ blobs: number; lastSyncAt: string | null }> {
+    const blobs = (await this.store.allBlobs()).filter((b) => b.deletedAt === null).length;
+    return { blobs, lastSyncAt: (await this.store.getMeta('lastSyncAt')) ?? null };
+  }
+
   /** 로컬 meta에 키 레코드가 있는지 (첫 실행 화면 vs 잠금 해제 화면 분기). */
   async hasLocalKeys(): Promise<boolean> {
     return (await this.store.getMeta('itemsKeyRecord')) !== undefined;
