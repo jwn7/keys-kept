@@ -8,6 +8,8 @@ export { type SyncBackend, ConflictError, OfflineError } from './sync/SyncBacken
 export { MemoryBackend } from './sync/MemoryBackend';
 export { DriveBackend, AuthError } from './sync/drive/DriveBackend';
 export type { DriveAuth, DriveBackendOptions } from './sync/drive/DriveBackend';
+export { SupabaseBackend } from './sync/supabase/SupabaseBackend';
+export type { SupabaseLike, SupabaseQuery, SupabaseChannel } from './sync/supabase/SupabaseBackend';
 export { SyncEngine } from './sync/SyncEngine';
 export type { SyncEvent, SyncResult, SyncEngineOptions } from './sync/SyncEngine';
 export { SyncScheduler } from './sync/SyncScheduler';

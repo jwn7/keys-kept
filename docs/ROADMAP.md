@@ -41,15 +41,15 @@
 - [x] 계정·데이터 삭제 흐름 (Drive 폴더 파일 + 로컬)
 
 ## 5단계 — 출시 준비 (주말 3)
-- [ ] Tauri 2 Android 빌드, 생체인증 키 저장(`KeyStorage.keychain`)
-- [ ] Google OAuth 동의 화면 등록, 개인정보처리방침 페이지
+- [ ] Tauri 2 Android 빌드, 생체인증 키 저장(`KeyStorage.keychain`) — 절차는 `docs/MOBILE.md`. Rust·Android SDK 필요(CI 밖)
+- [ ] Google OAuth 동의 화면 등록 (Cloud Console, 사람이 함) · [x] 개인정보처리방침 초안 `docs/PRIVACY.md`
 - [ ] Play 내부 테스트 → 비공개 테스트
-- [ ] README 위협 모델 공개
+- [x] README 위협 모델 공개
 
 ## 6단계 — Pro (이후)
-- [ ] `sync/supabase/SupabaseBackend.ts` + Realtime
-- [ ] `supabase/migrations/0001_init.sql` 적용, RLS 테스트
-- [ ] Edge Function `backup-mail` (Resend, 40MB 체크, Storage 링크 대체)
+- [x] `sync/supabase/SupabaseBackend.ts` + Realtime (가짜 클라이언트 테스트; 실제 supabase-js 연결은 Pro UI에서)
+- [ ] `supabase/migrations/0001_init.sql` 적용, RLS 테스트 — `0002_put_item.sql`(원자적 version 비교), `0003_backups_bucket.sql` 추가. `supabase start`로 적용·검증은 미실행
+- [x] Edge Function `backup-mail` (Resend, 40MB 체크, Storage 링크 대체) — 코드만, 배포·실발송 미검증
 - [ ] pg_cron 주간 트리거 → 클라이언트에 "백업 요청" 푸시 (서버는 age 파일을 만들 수 없으므로 클라이언트가 생성)
 - [ ] Play 결제 구독, 첨부파일(Storage 청크 암호화)
 - [ ] Tauri 데스크톱 패키징, iOS

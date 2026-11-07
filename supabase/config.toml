@@ -1,0 +1,23 @@
+# supabase start / supabase db reset 용 최소 설정. 프로젝트 id는 링크 시 덮어쓴다.
+project_id = "vault"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+
+[functions.backup-mail]
+verify_jwt = true
