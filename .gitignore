@@ -9,3 +9,11 @@ coverage/
 supabase/.temp/
 apps/desktop/src-tauri/target/
 apps/mobile/src-tauri/target/
+
+# 서명 키·비밀 (절대 커밋 금지)
+*.keystore
+*.jks
+keystore.properties
+*service-account*.json
+google-services.json
+supabase/functions/.env
