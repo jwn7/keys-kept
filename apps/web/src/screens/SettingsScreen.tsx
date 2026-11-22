@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { backupFileName, exportBackup, exportObsidianZip, obsidianZipName, parseMarkdownFiles, WrongPasswordError } from '@vault/core';
 import { useApp } from '../app/store';
 import { GisDriveAuth } from '../app/driveAuth';
@@ -7,6 +7,8 @@ import { proAvailable, proSessionEmail, proSignIn, proSignOut, setProEnabled } f
 import { ko } from '../i18n/ko';
 import { downloadBytes, passwordScore, pickDirectoryFiles, relTime, shareOrDownload } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
+import { ui } from '../app/ui';
+import { BackIcon } from '../components/Icons';
 import { RestoreCard } from './UnlockScreen';
 
 const S = ko.settings;
@@ -14,16 +16,37 @@ const S = ko.settings;
 export function SettingsScreen() {
   const setScreen = useApp((s) => s.setScreen);
   const [section, setSection] = useState<keyof typeof S.nav>('sync');
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // 스크롤 위치에 따라 왼쪽 메뉴의 현재 항목을 바꾼다
+  useEffect(() => {
+    const root = bodyRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (top) setSection(top.target.id as keyof typeof S.nav);
+      },
+      { root, rootMargin: '-8% 0px -70% 0px' },
+    );
+    for (const el of Array.from(root.querySelectorAll('section[id]'))) io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const go = (k: keyof typeof S.nav) => {
+    setSection(k);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(k)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  };
   return (
     <div className="settings">
       <header className="topbar" style={{ justifyContent: 'flex-start' }}>
-        <button type="button" className="btn-link" onClick={() => setScreen('main')}>← {S.backToNotes}</button>
-        <strong>{S.title}</strong>
+        <button type="button" className="back-btn" aria-label={S.backToNotes} onClick={() => setScreen('main')}><BackIcon />{S.backShort}</button>
+        <h1 className="page-title">{S.title}</h1>
       </header>
-      <div className="settings-body">
+      <div className="settings-body" ref={bodyRef}>
+        <div className="settings-inner">
         <nav className="settings-nav" aria-label={S.title}>
           {(Object.keys(S.nav) as (keyof typeof S.nav)[]).map((k) => (
-            <a key={k} href={`#${k}`} aria-current={section === k ? 'true' : undefined} onClick={() => setSection(k)}>{S.nav[k]}</a>
+            <button key={k} type="button" aria-current={section === k ? 'true' : undefined} onClick={() => go(k)}>{S.nav[k]}</button>
           ))}
         </nav>
         <div className="settings-main">
@@ -32,6 +55,7 @@ export function SettingsScreen() {
           <SecuritySection />
           <DataSection />
           <LookSection />
+        </div>
         </div>
       </div>
     </div>
@@ -62,7 +86,7 @@ function SyncSection() {
   }, [pro]);
   const upgrade = async () => {
     if (!proAvailable()) {
-      window.alert(S.sync.comingSoon);
+      await ui.alert({ title: S.sync.pro, body: S.sync.comingSoon });
       return;
     }
     if (proEmail) {
@@ -74,7 +98,7 @@ function SyncSection() {
     await proSignIn();
   };
   const proOff = async () => {
-    if (!window.confirm(S.sync.proDisconnectConfirm)) return;
+    if (!(await ui.confirm({ title: S.sync.proDisconnectTitle, body: S.sync.proDisconnectConfirm, confirmLabel: S.sync.proDisconnect, danger: true }))) return;
     await proSignOut();
     window.location.reload();
   };
@@ -91,8 +115,8 @@ function SyncSection() {
       setBusy(false);
     }
   };
-  const disconnect = () => {
-    if (!window.confirm(S.sync.driveDisconnectConfirm)) return;
+  const disconnect = async () => {
+    if (!(await ui.confirm({ title: S.sync.driveDisconnectTitle, body: S.sync.driveDisconnectConfirm, confirmLabel: S.sync.driveDisconnect, danger: true }))) return;
     app.driveAuth?.disconnect();
     window.location.reload();
   };
@@ -106,10 +130,10 @@ function SyncSection() {
             <span>{S.sync.drive}</span>
             {connected ? <span className="badge ok" style={{ fontSize: 11 }}>{S.sync.driveInUse}</span> : <span className="badge muted" style={{ fontSize: 11 }}>{S.sync.driveOff}</span>}
           </div>
-          <div style={{ color: 'var(--ink-2)' }}>{S.sync.driveDesc(connected ? GisDriveAuth.email() : null)}</div>
+          {connected && GisDriveAuth.email() && <div style={{ color: 'var(--ink-2)' }}>{GisDriveAuth.email()}</div>}
           {connected && (
             <div className="small muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <StatusBadge status={status} local={false} /> · {ko.main.count(notes.length)}
+              <StatusBadge status={status} local={false} /> {ko.main.count(notes.length)}
             </div>
           )}
           {!GOOGLE_CLIENT_ID && <div className="small" style={{ color: 'var(--warn)' }}>{S.sync.driveNoClient}</div>}
@@ -118,7 +142,7 @@ function SyncSection() {
             {connected ? (
               <>
                 <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void app.session.sync()}>{ko.sync.now}</button>
-                <button type="button" className="btn-link muted" onClick={disconnect}>{S.sync.driveDisconnect}</button>
+                <button type="button" className="btn-link muted" onClick={() => void disconnect()}>{S.sync.driveDisconnect}</button>
               </>
             ) : (
               <button type="button" className="btn btn-sm" disabled={!GOOGLE_CLIENT_ID || busy} onClick={() => void connect()}>{S.sync.driveConnect}</button>
@@ -143,15 +167,18 @@ function SyncSection() {
       </div>
       <div className="sees">
         <strong style={{ fontWeight: 500 }}>{S.sync.sees}</strong>
-        <div className="grid">
-          <div><span className="yes">✓</span> {S.sync.seesYes.slice(1)}</div>
-          <div><span className="no">✕</span> {S.sync.seesNo.slice(1)}</div>
-        </div>
+        <dl className="sees-list">
+          <dt className="yes">{S.sync.seesYes}</dt>
+          <dd>{S.sync.seesYesItems}</dd>
+          <dt className="no">{S.sync.seesNo}</dt>
+          <dd>{S.sync.seesNoItems}</dd>
+        </dl>
       </div>
       <div className="row">
         <span>{S.sync.deviceName}</span>
         <div className="input-wrap sm" style={{ width: 240 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setDeviceName(name.trim() || app.deviceName)} aria-label={S.sync.deviceName} />
+          {name && <button type="button" className="clear" aria-label={ko.common.clear} onClick={() => setName('')}>×</button>}
         </div>
       </div>
     </section>
@@ -183,7 +210,6 @@ function BackupSection() {
   return (
     <section id="backup" className="card">
       <h2>{S.nav.backup}</h2>
-      <p className="small" style={{ color: 'var(--ink-2)' }}>{S.backup.desc}</p>
       <div className="field" style={{ maxWidth: 360 }}>
         <label htmlFor="bp">{S.backup.passphrase}</label>
         <div className="input-wrap">
@@ -192,10 +218,10 @@ function BackupSection() {
         </div>
       </div>
       <div className="row">
-        <span className="small muted"><span style={{ color: 'var(--ok)' }}>✓</span> {S.backup.last(lastBackupAt ? relTime(lastBackupAt) : null)}</span>
+        <span className="small muted">{lastBackupAt && <span style={{ color: 'var(--ok)' }}>✓ </span>}{S.backup.last(lastBackupAt ? relTime(lastBackupAt) : null)}</span>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="btn btn-sm" disabled={!pass || busy} onClick={() => void make()}>{busy ? S.backup.making : S.backup.download}</button>
-          <button type="button" className="btn btn-sm" onClick={() => window.alert(S.backup.mailPro)}>{S.backup.mail}</button>
+          <button type="button" className="btn btn-sm" onClick={() => void ui.alert({ title: S.backup.mail, body: S.backup.mailPro })}>{S.backup.mail}</button>
         </div>
       </div>
       <div className="row">
@@ -203,8 +229,8 @@ function BackupSection() {
         <button type="button" className="btn btn-sm" onClick={() => setRestoreOpen(true)}>{S.backup.restore}</button>
       </div>
       {restoreOpen && (
-        <div className="overlay" onClick={() => setRestoreOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 460 }}>
+        <div className="overlay center" onClick={() => setRestoreOpen(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
             <RestoreCard firstRun={false} onBack={() => setRestoreOpen(false)} />
           </div>
         </div>
@@ -214,7 +240,6 @@ function BackupSection() {
 }
 
 function SecuritySection() {
-  const app = useApp((s) => s.app);
   const autoLockMin = useApp((s) => s.autoLockMin);
   const setPref = useApp((s) => s.setPref);
   const [pwOpen, setPwOpen] = useState(false);
@@ -222,7 +247,6 @@ function SecuritySection() {
   return (
     <section id="security" className="card">
       <h2>{S.nav.security}</h2>
-      <div className="row"><span className="muted">{S.security.pcNote}</span></div>
       <div className="row">
         <span>{S.security.autoLock}</span>
         <div className="segment" role="group" aria-label={S.security.autoLock}>
@@ -236,12 +260,11 @@ function SecuritySection() {
         <button type="button" className="btn btn-sm" onClick={() => setPwOpen(true)}>{S.security.change}</button>
       </div>
       <div className="row">
-        <span>{S.security.recovery} <span className="muted">({S.security.recoveryHint})</span></span>
+        <span>{S.security.recovery}</span>
         <button type="button" className="btn btn-sm" onClick={() => setRkOpen(true)}>{S.security.issue}</button>
       </div>
       {pwOpen && <ChangePasswordDialog onClose={() => setPwOpen(false)} />}
       {rkOpen && <RotateRecoveryDialog onClose={() => setRkOpen(false)} />}
-      <span className="sr-only">{app.deviceId}</span>
     </section>
   );
 }
@@ -267,7 +290,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
     }
   };
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay center" onClick={onClose}>
       <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>{S.security.changePassword}</h2>
         <div className="field"><label htmlFor="cur">{S.security.current}</label><div className="input-wrap"><input id="cur" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoFocus /></div></div>
@@ -302,7 +325,7 @@ function RotateRecoveryDialog({ onClose }: { onClose: () => void }) {
     }
   };
   return (
-    <div className="overlay" onClick={phrase ? undefined : onClose}>
+    <div className="overlay center" onClick={phrase ? undefined : onClose}>
       <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>{S.security.recovery}</h2>
         {phrase ? (
@@ -331,8 +354,8 @@ function DataSection() {
   const app = useApp((s) => s.app);
   const notes = useApp((s) => s.notes);
   const [msg, setMsg] = useState<string | null>(null);
-  const exportZip = () => {
-    if (!window.confirm(S.data.obsidianWarn)) return;
+  const exportZip = async () => {
+    if (!(await ui.confirm({ title: S.data.obsidianTitle, body: S.data.obsidianWarn, confirmLabel: S.data.export }))) return;
     downloadBytes(obsidianZipName(), exportObsidianZip(notes), 'application/zip');
   };
   const importMd = async () => {
@@ -346,8 +369,8 @@ function DataSection() {
     setMsg(S.data.imported(added, 0, 0));
   };
   const deleteAll = async () => {
-    const word = window.prompt(S.data.deleteConfirm);
-    if (word !== S.data.deleteWord) return;
+    const ok = await ui.confirm({ title: S.data.deleteTitle, body: S.data.deleteConfirm, requireWord: S.data.deleteWord, confirmLabel: S.data.deleteWord, danger: true });
+    if (!ok) return;
     await app.session.purgeEverything();
     app.driveAuth?.disconnect();
     try {
@@ -360,7 +383,7 @@ function DataSection() {
   return (
     <section id="data" className="card">
       <h2>{S.nav.data}</h2>
-      <div className="row"><span>{S.data.obsidian} <span className="muted">({S.data.obsidianHint})</span></span><button type="button" className="btn btn-sm" onClick={exportZip}>{S.data.export}</button></div>
+      <div className="row"><span>{S.data.obsidian} <span className="muted">({S.data.obsidianHint})</span></span><button type="button" className="btn btn-sm" onClick={() => void exportZip()}>{S.data.export}</button></div>
       <div className="row"><span>{S.data.importMd}</span><button type="button" className="btn btn-sm" onClick={() => void importMd()}>{S.data.import}</button></div>
       {msg && <p className="small" style={{ color: 'var(--ok)' }}>{msg}</p>}
       <div className="row"><span>{S.data.deleteAll} <span className="muted">({S.data.deleteAllHint})</span></span><button type="button" className="btn btn-sm btn-danger" onClick={() => void deleteAll()}>{S.data.deleteBtn}</button></div>
@@ -371,6 +394,7 @@ function DataSection() {
 function LookSection() {
   const theme = useApp((s) => s.theme);
   const fontSize = useApp((s) => s.fontSize);
+  const editorWidth = useApp((s) => s.editorWidth);
   const setPref = useApp((s) => s.setPref);
   return (
     <section id="look" className="card">
@@ -385,6 +409,12 @@ function LookSection() {
         <span>{S.look.fontSize}</span>
         <div className="segment" role="group" aria-label={S.look.fontSize}>
           {(['s', 'm', 'l'] as const).map((t) => <button key={t} type="button" aria-pressed={fontSize === t} onClick={() => setPref('fontSize', t)}>{S.look.sizes[t]}</button>)}
+        </div>
+      </div>
+      <div className="row desktop-only">
+        <span>{S.look.editorWidth}</span>
+        <div className="segment" role="group" aria-label={S.look.editorWidth}>
+          {(['narrow', 'normal', 'wide'] as const).map((t) => <button key={t} type="button" aria-pressed={editorWidth === t} onClick={() => setPref('editorWidth', t)}>{S.look.widths[t]}</button>)}
         </div>
       </div>
     </section>

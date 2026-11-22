@@ -76,6 +76,7 @@ export function createAppSession(): AppSession {
     deviceName,
     kdfProfile: isMobileProfile() ? 'mobile' : 'desktop',
     isOnline: () => navigator.onLine,
+    versionWindowMs: 5 * 60_000,
   });
   const scheduler = new SyncScheduler({
     run: () => session.sync(),

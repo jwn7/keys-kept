@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { backupFileName, exportBackup } from '@vault/core';
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
-import { displayTitle, relTime, shareOrDownload } from '../app/util';
+import { displayTitle, matchSnippet, relTime, shareOrDownload } from '../app/util';
+import { ui } from '../app/ui';
 import { useNoteActions } from './MainScreen';
 
 type Item = { id: string; kind: 'note' | 'cmd'; label: string; meta?: string; key?: string; run: () => void | Promise<void> };
@@ -30,11 +31,12 @@ export function CommandPalette() {
         id: n.id,
         kind: 'note',
         label: displayTitle(n),
-        meta: `${n.folder ?? ko.main.noFolder} · ${relTime(n.updatedAt)}`,
+        // 제목이 아니라 본문에서 찾았으면 그 대목을 보여준다
+        meta: (needle && !n.title.toLowerCase().includes(needle) && matchSnippet(n.body, needle)) || `${n.folder ?? ko.main.noFolder}, ${relTime(n.updatedAt)}`,
         run: () => select(n.id),
       }));
     const all: Item[] = [
-      { id: 'new', kind: 'cmd', label: ko.palette.cmd.newNote, key: 'Ctrl N', run: () => void actions.newNote() },
+      { id: 'new', kind: 'cmd', label: ko.palette.cmd.newNote, key: 'Alt N', run: () => void actions.newNote() },
       { id: 'today', kind: 'cmd', label: ko.palette.cmd.today, key: 'Ctrl D', run: () => void actions.today() },
       { id: 'sync', kind: 'cmd', label: ko.palette.cmd.sync, run: () => void actions.syncNow() },
       {
@@ -42,7 +44,7 @@ export function CommandPalette() {
         kind: 'cmd',
         label: ko.palette.cmd.backup,
         run: async () => {
-          const pass = window.prompt(ko.settings.backup.passphrase);
+          const pass = await ui.prompt({ title: ko.settings.backup.makeTitle, label: ko.settings.backup.passphrase, password: true, confirmLabel: ko.settings.backup.download });
           if (!pass) return;
           const bytes = await exportBackup(app.session.list(), pass, app.deviceName);
           await shareOrDownload(backupFileName(), bytes);
@@ -118,7 +120,6 @@ export function CommandPalette() {
           <span>{ko.palette.hints.move}</span>
           <span>{ko.palette.hints.open}</span>
           <span>{ko.palette.hints.close}</span>
-          <span className="end">{ko.palette.hints.local}</span>
         </div>
       </div>
     </div>

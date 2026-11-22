@@ -1,33 +1,46 @@
-/* docs/DESIGN.md 토큰을 그대로 옮긴 것. 바꾸면 문서도 같이 바꾼다. */
+/*
+ * docs/DESIGN.md 토큰을 그대로 옮긴 것. 바꾸면 문서도 같이 바꾼다.
+ * 방향: "흰 종이 위의 인장". 바탕은 순백, 면은 선 대신 아주 옅은 회색 채움으로 나눈다.
+ * 빨강은 도장과 '오늘'에만. 노션식 따뜻한 회색은 쓰지 않는다(차가운 중성 회색).
+ */
 :root {
-  --paper: #F7F4EE;
-  --surface: #FFFFFF;
-  --surface-2: #FBFAF7;
-  --ink: #1B1A17;
-  --ink-2: #4A463F;
-  --muted: #6B675F;
-  --line: #E3DED4;
-  --line-2: #ECE8DF;
-  --line-strong: #C9C3B8;
-  --accent: #A8372B;
-  --accent-soft: #F6E7E3;
-  --ok: #2F6B4F;
-  --warn: #8A5A12;
-  --danger: #8A2A20;
-  --radius-s: 8px; --radius-m: 10px; --radius-l: 16px;
-  --font-sans: 'Noto Sans KR', system-ui, sans-serif;
-  --font-serif: 'Noto Serif KR', serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --paper: #FFFFFF;      /* 앱 바탕 */
+  --surface: #FFFFFF;    /* 편집기·입력·대화상자 */
+  --surface-2: #F7F8FA;  /* 묶음 목록 바탕, 보조 패널 */
+  --fill: #F1F3F5;       /* 선택·눌린 항목, 칩 */
+  --fill-hover: #F5F6F8; /* 마우스를 올린 행 */
+  --ink: #15171C;        /* 본문 */
+  --ink-2: #3D424C;      /* 설명 */
+  --muted: #6A707C;      /* 보조 (흰 바탕 대비 4.9:1) */
+  --line: #E7E9ED;       /* 구분선 */
+  --line-2: #EFF1F4;     /* 목록 행 구분 */
+  --line-strong: #CDD1D8;/* 입력 테두리 */
+  --accent: #C8322B;     /* 인주 빨강: 도장, 오늘, 현재 위치 점 */
+  --accent-soft: #FCEBEA;
+  --primary: #15171C;    /* 주 버튼 */
+  --on-primary: #FFFFFF;
+  --ok: #1F7A50;
+  --warn: #8A5A00;
+  --danger: #B42318;
+  /* 손이 닿는 것은 둥글게, 큰 면은 조금 더 둥글게 */
+  --radius-s: 8px; --radius-m: 10px; --radius-l: 14px;
+  --font-sans: 'IBM Plex Sans KR', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Hahmlet', 'Noto Serif KR', serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   --body-size: 15px;
   --motion: 160ms;
+  --lift: 0 1px 2px rgba(21, 23, 28, .06), 0 8px 24px rgba(21, 23, 28, .08);
   color-scheme: light;
 }
 [data-theme="dark"] {
-  --paper: #171614; --surface: #1F1E1B; --surface-2: #1A1917;
-  --ink: #EDE9E1; --ink-2: #C9C4B9; --muted: #9A958B;
-  --line: #2E2C28; --line-2: #262421; --line-strong: #4A463F;
-  --accent: #D4655A; --accent-soft: #3A2320;
-  --ok: #6FB08F; --warn: #D9A04A; --danger: #E07068;
+  --paper: #121316; --surface: #17191D; --surface-2: #1B1D22;
+  --fill: #23262C; --fill-hover: #1F2227;
+  --ink: #ECEEF1; --ink-2: #C3C8D0; --muted: #959BA6;
+  --line: #2A2D33; --line-2: #23262B; --line-strong: #444852;
+  --accent: #F06A5E; --accent-soft: #3A1E1C;
+  --primary: #ECEEF1; --on-primary: #121316;
+  --ok: #5FC08C; --warn: #E0A648; --danger: #F2827A;
+  --lift: 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, .5);
   color-scheme: dark;
 }
 @media (prefers-reduced-motion: reduce) {

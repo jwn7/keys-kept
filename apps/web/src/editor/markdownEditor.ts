@@ -1,5 +1,5 @@
 import { EditorState, Compartment, type Extension } from '@codemirror/state';
-import { EditorView, keymap, placeholder as placeholderExt, drawSelection, highlightActiveLine } from '@codemirror/view';
+import { Decoration, EditorView, MatchDecorator, ViewPlugin, keymap, placeholder as placeholderExt, drawSelection, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
@@ -21,6 +21,45 @@ const mdHighlight = HighlightStyle.define([
   { tag: t.strikethrough, class: 'cm-md-done' },
   { tag: [t.processingInstruction, t.meta, t.contentSeparator], class: 'cm-md-mark' },
 ]);
+
+/**
+ * 마크다운 문법에 없는 이 앱의 표기 세 가지를 꾸민다: 체크박스 `[ ]`/`[x]`, `[[메모 링크]]`, `#태그`.
+ * 글자는 그대로 두고 class만 입힌다 (문서 내용은 바뀌지 않음). 모양은 app.css의 .cm-md-* 가 정한다.
+ */
+const boxMark = Decoration.mark({ class: 'cm-md-box' });
+const boxDoneMark = Decoration.mark({ class: 'cm-md-box cm-md-box-done' });
+const doneLine = Decoration.line({ class: 'cm-md-done-line' });
+const wikiMark = Decoration.mark({ class: 'cm-md-wiki' });
+const tagMark = Decoration.mark({ class: 'cm-md-tag' });
+const inlineMatcher = new MatchDecorator({
+  // 1: 목록 머리(`- `, `1. `)  2: 체크박스  3: [[링크]]  4: 태그 앞 공백  5: #태그
+  regexp: /(^\s*(?:[-*+]|\d+\.)\s+)(\[[ xX]\])|(\[\[[^\]\n]+\]\])|(^|\s)(#[\p{L}\p{N}_-]+)/gu,
+  decorate: (add, from, _to, m) => {
+    if (m[2] !== undefined) {
+      const done = m[2] !== '[ ]';
+      if (done) add(from, from, doneLine);
+      const start = from + (m[1]?.length ?? 0);
+      add(start, start + 3, done ? boxDoneMark : boxMark);
+    } else if (m[3] !== undefined) {
+      add(from, from + m[3].length, wikiMark);
+    } else if (m[5] !== undefined) {
+      const start = from + (m[4]?.length ?? 0);
+      add(start, start + m[5].length, tagMark);
+    }
+  },
+});
+const inlineMarks = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = inlineMatcher.createDeco(view);
+    }
+    update(u: ViewUpdate) {
+      this.decorations = inlineMatcher.updateDeco(u, this.decorations);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
 /** `/` 명령 (SPEC §2.2) */
 function slashSource(ctx: CompletionContext): CompletionResult | null {
@@ -113,6 +152,8 @@ export type EditorHandle = {
   insertAtLineStart(prefix: string): void;
   insert(text: string, cursorOffset?: number): void;
   openSlash(): void;
+  /** 휴지통의 메모는 읽기만 */
+  setReadOnly(readOnly: boolean): void;
   destroy(): void;
 };
 
@@ -128,7 +169,7 @@ export function createMarkdownEditor(opts: {
   const extensions: Extension[] = [
     history(),
     drawSelection(),
-    highlightActiveLine(),
+    inlineMarks,
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(mdHighlight),
     autocompletion({ override: [slashSource, wikiSource(opts.titles)], icons: false, activateOnTyping: true }),
@@ -146,7 +187,7 @@ export function createMarkdownEditor(opts: {
     EditorView.updateListener.of((u) => {
       if (u.docChanged) opts.onChange(u.state.doc.toString());
     }),
-    readOnly.of(EditorState.readOnly.of(false)),
+    readOnly.of([]),
   ];
   const view = new EditorView({ state: EditorState.create({ doc: opts.doc, extensions }), parent: opts.parent });
   return {
@@ -171,6 +212,9 @@ export function createMarkdownEditor(opts: {
       view.dispatch({ changes: { from: line.to, insert: ins }, selection: { anchor: line.to + ins.length } });
       view.focus();
       startCompletion(view);
+    },
+    setReadOnly(ro) {
+      view.dispatch({ effects: readOnly.reconfigure(ro ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []) });
     },
     destroy() {
       view.destroy();

@@ -3,6 +3,8 @@ import { WrongPasswordError, NotSetUpError, BackupFormatError, BackupPassphraseE
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
 import { passwordScore, pickFile, relTime } from '../app/util';
+import { GOOGLE_CLIENT_ID } from '../app/session';
+import { Logo, Seal } from '../components/Seal';
 
 type Mode = 'password' | 'recovery' | 'restore';
 
@@ -25,19 +27,22 @@ export function UnlockScreen({ firstRun }: { firstRun: boolean }) {
   return (
     <div className="unlock">
       <section className="unlock-left">
-        <span className="logo" style={{ fontSize: 20 }}>{ko.app.name}</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 460 }}>
+        <Logo fontSize={18} />
+        <div className="unlock-pitch">
+          <Seal size="hero" />
           <h1>
             {ko.app.taglineLines[0]}
             <br />
             {ko.app.taglineLines[1]}
           </h1>
-          <p>{ko.app.intro}</p>
-          <ul>
-            {ko.app.bullets.map((b) => (
-              <li key={b}>{b}</li>
+          <dl className="unlock-facts">
+            {ko.app.sees.map((r) => (
+              <div key={r.label}>
+                <dt>{r.label}</dt>
+                <dd>{r.value}</dd>
+              </div>
             ))}
-          </ul>
+          </dl>
         </div>
         <p className="small muted">{count !== null ? ko.app.localCount(count, lastSync && relTime(lastSync)) : ' '}</p>
       </section>
@@ -92,7 +97,7 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
       setPw('');
     } catch (err) {
       if (err instanceof WrongPasswordError) setError(ko.unlock.wrong);
-      else if (err instanceof NotSetUpError) setError(ko.setup.sub);
+      else if (err instanceof NotSetUpError) setError(ko.setup.driveEmpty);
       else setError(String(err));
     } finally {
       setBusy(false);
@@ -103,16 +108,15 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
     <form className="unlock-card" onSubmit={submit}>
       <div>
         <h2>{ko.unlock.title}</h2>
-        <p className="small muted">{ko.unlock.sub}</p>
       </div>
       <PasswordField id="pw" label={ko.unlock.password} value={pw} onChange={setPw} placeholder={ko.unlock.passwordPlaceholder} autoFocus />
-      {error ? <p className="error small" style={{ color: 'var(--danger)' }}>{error}</p> : <p className="small muted">{ko.unlock.derivingHint}</p>}
+      {error && <p className="error small" style={{ color: 'var(--danger)' }}>{error}</p>}
       <button type="submit" className="btn btn-primary" disabled={!pw || busy} style={{ height: 48 }}>
         {busy ? ko.unlock.deriving : ko.unlock.open}
       </button>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--ink-2)' }}>
-        <input type="checkbox" checked={autoLockMin > 0} onChange={(e) => setAutoLock(e.target.checked ? 15 : 0)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
-        {ko.unlock.autoLock(autoLockMin || 15)}
+      <label className="switch-row">
+        <span>{ko.unlock.autoLock(autoLockMin || 15)}</span>
+        <input type="checkbox" role="switch" className="switch" checked={autoLockMin > 0} onChange={(e) => setAutoLock(e.target.checked ? 15 : 0)} />
       </label>
       <div className="unlock-links">
         <button type="button" className="btn-link" onClick={onRecovery}>{ko.unlock.forgot}</button>
@@ -174,17 +178,21 @@ function Strength({ score }: { score: number }) {
       <div className="strength" aria-hidden="true">
         <div style={{ width: `${(score / 4) * 100}%`, background: colors[score] }} />
       </div>
-      <span className="small muted">{ko.setup.strength[score]}{score < 3 ? ` · ${ko.setup.tooWeak}` : ''}</span>
+      <span className="small muted">
+        <strong style={{ fontWeight: 500, color: 'var(--ink-2)' }}>{ko.setup.strength[score]}</strong>
+        {score < 3 && <> {ko.setup.tooWeak}</>}
+      </span>
     </div>
   );
 }
 
 /** 복구 문구 12단어 표시. 닫으면 다시 볼 수 없다. */
-function PhraseView({ phrase, onAck }: { phrase: string[]; onAck: () => void }) {
+function PhraseView({ phrase, onAck, step }: { phrase: string[]; onAck: () => void; step?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="unlock-card">
       <div>
+        {step && <span className="steps">{step}</span>}
         <h2>{ko.setup.phraseTitle}</h2>
         <p className="small muted">{ko.setup.phraseSub}</p>
       </div>
@@ -238,13 +246,14 @@ function SetupCard({ onRestore }: { onRestore: () => void }) {
     }
   };
 
-  if (phrase) return <PhraseView phrase={phrase} onAck={() => useApp.getState().setScreen('main')} />;
+  if (phrase) return <PhraseView phrase={phrase} step={ko.setup.step(2, 2)} onAck={() => useApp.getState().setScreen('main')} />;
 
   return (
     <form className="unlock-card" onSubmit={submit}>
       <div>
+        <span className="steps">{ko.setup.step(1, 2)}</span>
         <h2>{ko.setup.title}</h2>
-        <p className="small muted">{ko.setup.sub}</p>
+        <p className="small muted">{ko.setup.subShort}</p>
       </div>
       <PasswordField id="pw" label={ko.setup.password} value={pw} onChange={setPw} placeholder={ko.unlock.passwordPlaceholder} autoFocus />
       <Strength score={score} />
@@ -253,9 +262,13 @@ function SetupCard({ onRestore }: { onRestore: () => void }) {
       <button type="submit" className="btn btn-primary" disabled={score < 3 || pw !== pw2 || !pw2 || busy} style={{ height: 48 }}>
         {busy ? ko.setup.creating : ko.setup.create}
       </button>
-      <p className="small muted">{ko.setup.localOnly}</p>
       <div className="unlock-links">
-        <span />
+        {/* 새 기기: 열쇠를 새로 만들지 않고 Drive의 볼트를 연다. 연결 후 다시 부팅하면 잠금 해제 화면이 뜬다 (bootApp). */}
+        {GOOGLE_CLIENT_ID && app.driveAuth ? (
+          <button type="button" className="btn-link" onClick={() => void app.driveAuth?.connect().then(() => window.location.reload())}>{ko.setup.fromDrive}</button>
+        ) : (
+          <span />
+        )}
         <button type="button" className="btn-link muted" onClick={onRestore}>{ko.unlock.restoreBackup}</button>
       </div>
     </form>
@@ -307,7 +320,6 @@ export function RestoreCard({ firstRun, onBack, onDone }: { firstRun: boolean; o
     <form className="unlock-card" onSubmit={run}>
       <div>
         <h2>{ko.restore.title}</h2>
-        <p className="small muted">{ko.restore.sub}</p>
       </div>
       <div className="field">
         <button type="button" className="btn" onClick={async () => setFile((await pickFile('.age'))[0] ?? null)}>

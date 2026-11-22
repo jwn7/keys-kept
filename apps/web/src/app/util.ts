@@ -13,13 +13,69 @@ export function relTime(iso: string | null | undefined, now = Date.now()): strin
   return ko.time.date(d.getMonth() + 1, d.getDate());
 }
 
+/** 로컬 시간 기준 `YYYY-MM-DD` */
+export function dayKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * 캘린더에 놓일 날짜. basis 'date' = 일정 날짜(없으면 제목이 `YYYY-MM-DD`인 오늘의 메모), 'created' = 작성일.
+ * 해당 날짜가 없으면 null (캘린더에 나오지 않는다).
+ */
+export function noteDay(n: Pick<Note, 'title' | 'createdAt'> & { date?: string | null }, basis: 'date' | 'created'): string | null {
+  if (basis === 'created') return dayKey(new Date(n.createdAt));
+  if (n.date && DAY_RE.test(n.date)) return n.date;
+  const t = n.title.trim();
+  return DAY_RE.test(t) ? t : null;
+}
+
+/** 월 달력 6주 × 7일. 일요일 시작. month는 0-11 */
+export function monthGrid(year: number, month: number): string[] {
+  const first = new Date(year, month, 1);
+  const start = new Date(year, month, 1 - first.getDay());
+  return Array.from({ length: 42 }, (_, i) => dayKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+}
+
+/** `2026-11-24` → `11월 24일 (화)` */
+export function formatDay(key: string): string {
+  const [y, m, d] = key.split('-').map(Number) as [number, number, number];
+  const w = ko.time.weekdays[new Date(y, m - 1, d).getDay()];
+  return `${m}월 ${d}일 (${w})`;
+}
+
 export function todayTitle(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 export function snippet(body: string, max = 80): string {
-  return body.replace(/^#+\s.*$/m, '').replace(/[#*`>\[\]_-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  return body
+    .replace(/^#+\s.*$/m, '')
+    .replace(/\[[ xX]\]/g, ' ') // 체크박스 표기 `[ ]` `[x]`
+    .replace(/[#*`>\[\]_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+/** 검색어가 본문에서 처음 나오는 곳 앞뒤를 잘라 보여준다. 없으면 빈 문자열. */
+export function matchSnippet(body: string, needle: string, radius = 28): string {
+  const q = needle.trim().toLowerCase();
+  if (!q) return '';
+  const flat = body.replace(/\s+/g, ' ');
+  const i = flat.toLowerCase().indexOf(q);
+  if (i < 0) return '';
+  const from = Math.max(0, i - radius);
+  const to = Math.min(flat.length, i + q.length + radius);
+  return `${from > 0 ? '…' : ''}${flat.slice(from, to).trim()}${to < flat.length ? '…' : ''}`;
+}
+
+/** 공백을 뺀 글자 수 (편집기 하단 표시) */
+export function charCount(body: string): number {
+  return [...body.replace(/\s/g, '')].length;
 }
 
 export function displayTitle(n: Pick<Note, 'title'>): string {

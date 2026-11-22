@@ -3,6 +3,7 @@ import type { Note } from '@vault/core';
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
 import { relTime } from '../app/util';
+import { ui } from '../app/ui';
 
 type Row = { version: number; savedAt: string; note: Note };
 
@@ -20,11 +21,10 @@ export function VersionHistory({ noteId, onClose }: { noteId: string; onClose: (
   }, [onClose]);
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay center" onClick={onClose}>
       <div className="dialog" role="dialog" aria-label={ko.history.title} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div>
           <h2>{ko.history.title}</h2>
-          <p className="small muted">{ko.history.sub}</p>
         </div>
         {rows === null ? (
           <div className="skeleton" />
@@ -35,12 +35,16 @@ export function VersionHistory({ noteId, onClose }: { noteId: string; onClose: (
             {rows.map((r, i) => (
               <div key={`${r.version}-${r.savedAt}`} className="history-row">
                 <span>
-                  {ko.history.version(r.version)} <span className="muted">· {relTime(r.savedAt)}{i === 0 ? ' · 현재' : ''}</span>
+                  {ko.history.version(r.version)} <span className="muted">{relTime(r.savedAt)}</span>
+                  {i === 0 && <span className="chip" style={{ marginLeft: 8 }}>{ko.history.current}</span>}
                 </span>
                 <span style={{ display: 'flex', gap: 6 }}>
                   <button type="button" className="btn btn-sm" onClick={() => setPreview(preview?.version === r.version ? null : r)}>{ko.history.preview}</button>
                   {i > 0 && (
-                    <button type="button" className="btn btn-sm" onClick={() => void app.session.revert(noteId, r.version).then(onClose)}>{ko.history.revert}</button>
+                    <button type="button" className="btn btn-sm" onClick={() => void app.session.revert(noteId, r.version).then(() => {
+                      onClose();
+                      ui.toast(ko.history.reverted(r.version));
+                    })}>{ko.history.revert}</button>
                   )}
                 </span>
               </div>
