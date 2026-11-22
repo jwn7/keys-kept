@@ -4,7 +4,8 @@ import type { EncryptedItem, ItemsKeyRecord } from '../model/types';
 export type OutboxOp = 'put' | 'delete';
 export type OutboxEntry = { id: string; op: OutboxOp; queuedAt: string; seq: number };
 /** seq: 자동 증가 기본키. version 번호는 기기마다 따로 올라가므로 (noteId, version)만으로는 유일하지 않다. */
-export type VersionEntry = { seq?: number; noteId: string; version: number; item: EncryptedItem; savedAt: string };
+/** windowStart: 이 스냅샷이 처음 만들어진 시각. 같은 편집 구간의 저장은 이 항목을 덮어쓴다 (pushVersion의 coalesceMs). */
+export type VersionEntry = { seq?: number; noteId: string; version: number; item: EncryptedItem; savedAt: string; windowStart?: string };
 
 /** DATA-MODEL.md §로컬 meta 키. 값 타입은 키마다 다르다. */
 export type MetaMap = {
@@ -73,9 +74,23 @@ export class LocalStore {
   }
 
   // ---- versions (로컬 전용, 최근 20개) ----
-  async pushVersion(item: EncryptedItem): Promise<void> {
+  /**
+   * coalesceMs를 주면: 같은 기기가 만든 가장 최근 스냅샷이 그 시간 안에 시작됐을 때 새 항목을 만들지 않고 덮어쓴다.
+   * 자동 저장(1초 디바운스)이 20칸을 몇 초 만에 다 쓰는 것을 막는다. 구간이 끝나면(기본 5분) 다음 저장이 새 칸을 연다.
+   */
+  async pushVersion(item: EncryptedItem, opts: { coalesceMs?: number; now?: number } = {}): Promise<void> {
+    const now = opts.now ?? Date.now();
+    const savedAt = new Date(now).toISOString();
     await this.db.transaction('rw', this.db.versions, async () => {
-      await this.db.versions.add({ noteId: item.id, version: item.version, item, savedAt: new Date().toISOString() });
+      if (opts.coalesceMs && opts.coalesceMs > 0) {
+        const rows = await this.db.versions.where('noteId').equals(item.id).toArray();
+        const latest = rows.sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0))[0];
+        if (latest && latest.item.deviceId === item.deviceId && now - new Date(latest.windowStart ?? latest.savedAt).getTime() < opts.coalesceMs) {
+          await this.db.versions.put({ ...latest, version: item.version, item, savedAt, windowStart: latest.windowStart ?? latest.savedAt });
+          return;
+        }
+      }
+      await this.db.versions.add({ noteId: item.id, version: item.version, item, savedAt, windowStart: savedAt });
       const keys = await this.db.versions.where('noteId').equals(item.id).primaryKeys();
       if (keys.length > VERSIONS_KEEP) {
         const sorted = [...keys].sort((a, b) => a - b);

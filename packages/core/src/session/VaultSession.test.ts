@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ready } from '../crypto/sodium';
 import { LocalStore } from '../store/LocalStore';
 import { MemoryBackend } from '../sync/MemoryBackend';
-import { LockedError, VaultSession, WrongPasswordError } from './VaultSession';
+import { LockedError, VaultMismatchError, VaultSession, WrongPasswordError } from './VaultSession';
 import { fastKdfParams } from '../test/params';
 
 beforeAll(ready);
@@ -33,6 +33,18 @@ describe('VaultSession', () => {
     expect(keys[0]?.wrappedKey).not.toBe(keys[0]?.wrappedKeyRecovery);
     expect(s.isLocked).toBe(false);
     expect(await store.getMeta('itemsKeyRecord')).toEqual(keys[0]);
+  });
+
+  it('versionWindowMs: 자동 저장은 한 칸으로 묶이고, 되돌리기는 직전 상태를 지우지 않는다', async () => {
+    const s = new VaultSession({ store, backend, deviceId: 'pc-1', kdfParams: fastKdfParams, versionWindowMs: 60_000 });
+    await s.setup('pw');
+    const n = await s.save({ title: 't', body: '1' });
+    await s.save({ id: n.id, body: '12' });
+    await s.save({ id: n.id, body: '123' });
+    expect((await s.history(n.id)).map((h) => h.note.body)).toEqual(['123']);
+    await s.revert(n.id, (await s.history(n.id))[0]!.version);
+    await s.save({ id: n.id, body: '새 글' }, { snapshot: true });
+    expect((await s.history(n.id)).map((h) => h.note.body)).toEqual(['새 글', '123', '123']);
   });
 
   it('save → list, 암호문만 blobs에, outbox에 put 1개', async () => {
@@ -97,6 +109,61 @@ describe('VaultSession', () => {
     expect(s2.list()).toHaveLength(0); // 블롭 동기화는 2단계
     expect(await store2.getMeta('itemsKeyRecord')).toBeDefined();
     await store2.destroy();
+  });
+
+  it('로컬 전용으로 시작한 볼트를 나중에 빈 백엔드에 연결하면 sync가 열쇠를 올리고, 새 기기가 그 열쇠로 연다', async () => {
+    const local = new MemoryBackend(); // Drive 연결 전 (앱의 로컬 전용 모드)
+    const s1 = make(store, local);
+    await s1.setup('pw');
+    await s1.save({ title: '처음 메모', body: '본문' });
+    expect(await backend.getKeys()).toHaveLength(0);
+
+    // 같은 기기, 이제 Drive(backend)에 연결된 상태로 다시 열기
+    const s1d = make(store, backend);
+    await s1d.unlock('pw');
+    await s1d.sync();
+    expect((await backend.getKeys()).map((k) => k.id)).toEqual([(await store.getMeta('itemsKeyRecord'))!.id]);
+
+    // 새 기기: 빈 로컬 + 같은 Drive
+    const store2 = new LocalStore(`session2-${Math.random()}`);
+    const s2 = make(store2, backend, 'phone-1');
+    await s2.unlock('pw');
+    await s2.sync();
+    expect(s2.list().map((n) => n.title)).toEqual(['처음 메모']);
+    await store2.destroy();
+  });
+
+  it('Drive에 다른 볼트의 열쇠가 있으면 sync는 VaultMismatchError로 멈추고 아무것도 올리지 않는다', async () => {
+    const other = make(new LocalStore(`other-${Math.random()}`), backend, 'other');
+    await other.setup('다른 비밀번호');
+    const before = await backend.getKeys();
+
+    const mine = make(store, new MemoryBackend());
+    await mine.setup('pw');
+    await mine.save({ title: '내 메모', body: '' });
+    const mineOnDrive = make(store, backend);
+    await mineOnDrive.unlock('pw');
+    await expect(mineOnDrive.sync()).rejects.toBeInstanceOf(VaultMismatchError);
+    expect(mineOnDrive.status).toMatchObject({ state: 'error' });
+    expect(await backend.getKeys()).toEqual(before);
+    expect(await backend.list(null)).toHaveLength(0);
+  });
+
+  it('date(일정 날짜): 암호문 안에 저장되고, 생략하면 이전 값 유지, null이면 지운다', async () => {
+    const s = make();
+    await s.setup('pw');
+    const n = await s.save({ title: '치과', body: '', date: '2026-11-24' });
+    expect(n.date).toBe('2026-11-24');
+    expect(JSON.stringify(await store.allBlobs())).not.toContain('2026-11-24');
+    await s.save({ id: n.id, body: '오후 3시' });
+    s.lock();
+    await s.unlock('pw');
+    expect(s.get(n.id)?.date).toBe('2026-11-24');
+    await s.save({ id: n.id, date: null });
+    expect(s.get(n.id)?.date ?? null).toBeNull();
+    // date 없이 만든 메모(이전 버전 앱)는 null로 읽힌다
+    const plain = await s.save({ title: '날짜 없음', body: '' });
+    expect(plain.date ?? null).toBeNull();
   });
 
   it('delete → tombstone: list에서 빠지고 blob은 deletedAt 설정, outbox delete', async () => {

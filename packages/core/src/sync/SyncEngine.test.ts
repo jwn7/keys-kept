@@ -5,6 +5,7 @@ import { MemoryBackend } from './MemoryBackend';
 import { VaultSession, isConflictCopy } from '../session/VaultSession';
 import { fastKdfParams } from '../test/params';
 import { SyncEngine } from './SyncEngine';
+import { AuthError } from './drive/DriveBackend';
 import type { EncryptedItem, SyncStatus } from '../model/types';
 
 beforeAll(ready);
@@ -221,5 +222,16 @@ describe('SyncEngine — 단위', () => {
     const engine = new SyncEngine({ store, backend, deviceId: 'me' });
     await engine.sync();
     expect(engine.status).toEqual({ state: 'error', message: 'boom' });
+  });
+
+  it('인증 만료(AuthError) → status auth, 대기 중인 변경은 outbox에 남는다', async () => {
+    const backend = new MemoryBackend();
+    backend.list = async () => { throw new AuthError('drive 401'); };
+    await store.putBlob(blob('a', 1, '2026-01-03T00:00:00.000Z', 'me'));
+    await store.enqueue('a', 'put');
+    const engine = new SyncEngine({ store, backend, deviceId: 'me' });
+    await engine.sync();
+    expect(engine.status).toEqual({ state: 'auth', pending: 1 });
+    expect(await store.outbox()).toHaveLength(1);
   });
 });

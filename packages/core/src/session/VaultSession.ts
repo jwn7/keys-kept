@@ -4,7 +4,7 @@ import { newItemsKey, newRecoveryPhrase, recoveryKey, unwrap, wrap } from '../cr
 import { decryptNote, encryptNote } from '../crypto/item';
 import { DecryptError } from '../crypto/errors';
 import type { LocalStore } from '../store/LocalStore';
-import type { SyncBackend } from '../sync/SyncBackend';
+import { OfflineError, type SyncBackend } from '../sync/SyncBackend';
 import { SyncEngine, type SyncResult } from '../sync/SyncEngine';
 import type { EncryptedItem, ItemsKeyRecord, KdfParams, Note, SyncStatus } from '../model/types';
 
@@ -27,6 +27,14 @@ export class NotSetUpError extends Error {
   }
 }
 
+/** 연결한 백엔드(Drive)에 이미 다른 볼트의 열쇠가 있다. 섞이지 않게 동기화를 멈춘다. */
+export class VaultMismatchError extends Error {
+  constructor() {
+    super('이 동기화 저장소에는 다른 Vault가 있습니다');
+    this.name = 'VaultMismatchError';
+  }
+}
+
 export type VaultSessionOptions = {
   store: LocalStore;
   backend: SyncBackend;
@@ -37,10 +45,12 @@ export type VaultSessionOptions = {
   kdfProfile?: 'desktop' | 'mobile';
   kdfParams?: () => KdfParams;
   isOnline?: () => boolean;
+  /** 자동 저장을 한 버전 칸으로 묶는 구간(ms). 0이면 저장마다 새 버전 (기본, 테스트용). 앱은 5분을 준다 (SPEC §2.4). */
+  versionWindowMs?: number;
 };
 
 /** save()에 넘기는 입력. id 없으면 새 메모. */
-export type NoteInput = Partial<Pick<Note, 'id' | 'title' | 'body' | 'tags' | 'folder' | 'pinned'>>;
+export type NoteInput = Partial<Pick<Note, 'id' | 'title' | 'body' | 'tags' | 'folder' | 'pinned'>> & { date?: string | null };
 
 export type SessionEvent =
   | { type: 'status'; status: SyncStatus }
@@ -65,12 +75,17 @@ export class VaultSession {
   private readonly deviceName: string;
   private readonly makeKdfParams: () => KdfParams;
   private readonly engine: SyncEngine;
+  private readonly versionWindowMs: number;
 
   private itemsKey: Uint8Array | null = null;
   private keyRecord: ItemsKeyRecord | null = null;
   private notes = new Map<string, Note>();
   private versions = new Map<string, number>();
   private listeners = new Set<(e: SessionEvent) => void>();
+  /** 이번 잠금 해제 동안 백엔드의 열쇠 레코드를 확인했는지 (sync마다 Drive를 한 번 더 읽지 않게) */
+  private remoteKeysChecked = false;
+  /** 엔진 밖에서 난 동기화 오류(볼트 불일치). 엔진이 다음 상태를 알리면 지운다. */
+  private statusOverride: SyncStatus | null = null;
 
   constructor(opts: VaultSessionOptions) {
     this.store = opts.store;
@@ -78,6 +93,7 @@ export class VaultSession {
     this.deviceId = opts.deviceId;
     this.deviceName = opts.deviceName ?? opts.deviceId;
     this.makeKdfParams = opts.kdfParams ?? (() => newKdfParams(opts.kdfProfile ?? 'desktop'));
+    this.versionWindowMs = opts.versionWindowMs ?? 0;
     this.engine = new SyncEngine({
       store: opts.store,
       backend: opts.backend,
@@ -86,7 +102,10 @@ export class VaultSession {
       ...(opts.isOnline ? { isOnline: opts.isOnline } : {}),
     });
     this.engine.on((e) => {
-      if (e.type === 'status') this.emit({ type: 'status', status: e.status });
+      if (e.type === 'status') {
+        this.statusOverride = null;
+        this.emit({ type: 'status', status: e.status });
+      }
       // 'changed'는 sync()에서 결과를 받은 뒤 동기적으로 적용한다 (이벤트로 하면 경쟁 상태).
     });
   }
@@ -95,7 +114,7 @@ export class VaultSession {
     return this.itemsKey === null;
   }
   get status(): SyncStatus {
-    return this.engine.status;
+    return this.statusOverride ?? this.engine.status;
   }
   get backendKind(): SyncBackend['kind'] {
     return this.backend.kind;
@@ -233,6 +252,7 @@ export class VaultSession {
     if (this.itemsKey) sodium.memzero(this.itemsKey);
     this.itemsKey = null;
     this.keyRecord = null;
+    this.remoteKeysChecked = false;
     this.notes.clear();
     this.versions.clear();
     this.emit({ type: 'lock', locked: true });
@@ -264,8 +284,11 @@ export class VaultSession {
     return n && n.deletedAt === null ? n : undefined;
   }
 
-  /** 새 메모 또는 수정. updatedAt = now, version = 이전 + 1. 암호화 → blobs, versions, outbox. */
-  async save(input: NoteInput): Promise<Note> {
+  /**
+   * 새 메모 또는 수정. updatedAt = now, version = 이전 + 1. 암호화 → blobs, versions, outbox.
+   * `snapshot: true`면 버전 기록에 반드시 새 칸을 만든다 (되돌리기처럼 직전 상태를 잃으면 안 되는 저장).
+   */
+  async save(input: NoteInput, opts: { snapshot?: boolean } = {}): Promise<Note> {
     this.requireUnlocked();
     const now = new Date().toISOString();
     const prev = input.id ? this.notes.get(input.id) : undefined;
@@ -277,11 +300,12 @@ export class VaultSession {
       tags: input.tags ?? extractTags(body),
       folder: input.folder !== undefined ? input.folder : (prev?.folder ?? null),
       pinned: input.pinned ?? prev?.pinned ?? false,
+      date: input.date !== undefined ? input.date : (prev?.date ?? null),
       createdAt: prev?.createdAt ?? now,
       updatedAt: now,
       deletedAt: null,
     };
-    await this.persist(note, 'put');
+    await this.persist(note, 'put', !opts.snapshot);
     this.emit({ type: 'notes' });
     return note;
   }
@@ -355,12 +379,22 @@ export class VaultSession {
   async revert(id: string, version: number): Promise<Note> {
     const old = (await this.history(id)).find((h) => h.version === version);
     if (!old) throw new Error(`no version ${version} for ${id}`);
-    return this.save({ id, title: old.note.title, body: old.note.body, tags: old.note.tags, folder: old.note.folder });
+    return this.save({ id, title: old.note.title, body: old.note.body, tags: old.note.tags, folder: old.note.folder, date: old.note.date ?? null }, { snapshot: true });
   }
 
   // ---- 동기화 ----
 
   async sync(): Promise<SyncResult> {
+    try {
+      await this.ensureRemoteKeys();
+    } catch (e) {
+      // 오프라인이면 엔진이 'offline'을 알린다. 그 밖의 오류(볼트 불일치)는 여기서 멈춘다.
+      if (!(e instanceof OfflineError)) {
+        this.statusOverride = { state: 'error', message: e instanceof Error ? e.message : String(e) };
+        this.emit({ type: 'status', status: this.statusOverride });
+        throw e;
+      }
+    }
     const result = await this.engine.sync();
     if (result.changedIds.length) await this.applyChanged(result.changedIds);
     return result;
@@ -400,6 +434,22 @@ export class VaultSession {
     await this.store.setMeta('deviceId', this.deviceId);
     await this.store.setMeta('deviceName', this.deviceName);
     return remote;
+  }
+
+  /**
+   * 로컬 전용으로 시작한 볼트는 열쇠 레코드가 이 기기에만 있다. 처음 Drive와 동기화할 때 올려서
+   * 새 기기가 같은 비밀번호로 열 수 있게 한다. Drive에 다른 볼트의 열쇠가 있으면 섞지 않고 멈춘다.
+   * (올라가는 것은 감싼 열쇠뿐이다. 비밀번호 없이는 못 연다: DATA-MODEL.md 키 계층)
+   */
+  private async ensureRemoteKeys(): Promise<void> {
+    const record = this.keyRecord;
+    if (this.remoteKeysChecked || !record) return;
+    const remote = await this.backend.getKeys();
+    if (!remote.some((k) => k.id === record.id)) {
+      if (remote.some((k) => k.protocol === record.protocol)) throw new VaultMismatchError();
+      await this.backend.putKeys([record]);
+    }
+    this.remoteKeysChecked = true;
   }
 
   private async saveKeyRecord(updated: ItemsKeyRecord): Promise<void> {
@@ -455,14 +505,14 @@ export class VaultSession {
     this.emit({ type: 'notes' });
   }
 
-  private async persist(note: Note, op: 'put' | 'delete'): Promise<void> {
+  private async persist(note: Note, op: 'put' | 'delete', coalesce = false): Promise<void> {
     const itemsKey = this.requireUnlocked();
     const record = this.keyRecord;
     if (!record) throw new NotSetUpError();
     const version = (this.versions.get(note.id) ?? 0) + 1;
     const item = encryptNote(itemsKey, record.id, note, this.deviceId, version);
     await this.store.putBlob(item);
-    await this.store.pushVersion(item);
+    await this.store.pushVersion(item, coalesce ? { coalesceMs: this.versionWindowMs } : {});
     await this.store.enqueue(note.id, op);
     this.notes.set(note.id, note);
     this.versions.set(note.id, version);

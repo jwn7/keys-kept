@@ -7,6 +7,8 @@ export type Note = {
   tags: string[];
   folder: string | null;
   pinned: boolean;
+  /** 일정 날짜 `YYYY-MM-DD` (캘린더 보기). 암호문 안에 있다. 이전 버전 메모에는 없을 수 있다. */
+  date?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -47,6 +49,8 @@ export type ItemsKeyRecord = {
 export type SyncStatus =
   | { state: 'synced'; at: string }
   | { state: 'offline'; pending: number }
+  /** 동기화 저장소 로그인이 만료됨. 사용자가 다시 연결해야 한다 (자동으로 로그인 창을 띄우지 않는다). */
+  | { state: 'auth'; pending: number }
   | { state: 'syncing' }
   | { state: 'conflict'; count: number }
   | { state: 'error'; message: string };

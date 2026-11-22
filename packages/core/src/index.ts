@@ -20,5 +20,5 @@ export { importBackup, BackupFormatError, BackupPassphraseError } from './backup
 export { exportObsidianZip, obsidianZipName, safeFileName } from './backup/obsidianExport';
 export { parseMarkdownFiles } from './backup/markdownImport';
 export type { MarkdownFile } from './backup/markdownImport';
-export { VaultSession, LockedError, WrongPasswordError, NotSetUpError, extractTags, isConflictCopy } from './session/VaultSession';
+export { VaultSession, LockedError, VaultMismatchError, WrongPasswordError, NotSetUpError, extractTags, isConflictCopy } from './session/VaultSession';
 export type { VaultSessionOptions, NoteInput, SessionEvent } from './session/VaultSession';

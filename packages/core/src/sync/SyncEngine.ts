@@ -76,6 +76,11 @@ export class SyncEngine {
         await this.setOffline();
         return result;
       }
+      // 드라이브 모듈을 가져오지 않으려고 이름으로 구분한다 (AuthError: sync/drive/DriveBackend.ts)
+      if (e instanceof Error && e.name === 'AuthError') {
+        this.setStatus({ state: 'auth', pending: (await this.store.outbox()).length });
+        return result;
+      }
       this.setStatus({ state: 'error', message: e instanceof Error ? e.message : String(e) });
       return result;
     }

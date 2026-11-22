@@ -52,6 +52,25 @@ describe('LocalStore', () => {
     expect((await store.outbox()).map((e) => e.id)).toEqual(['b']);
   });
 
+  it('versions: coalesceMs 안의 저장은 같은 칸을 덮어쓰고, 구간이 지나면 새 칸을 연다', async () => {
+    const t0 = Date.UTC(2026, 10, 7);
+    const win = 5 * 60_000;
+    await store.pushVersion(blob('a', 1), { coalesceMs: win, now: t0 });
+    await store.pushVersion(blob('a', 2), { coalesceMs: win, now: t0 + 1_000 });
+    await store.pushVersion(blob('a', 3), { coalesceMs: win, now: t0 + 4 * 60_000 });
+    expect((await store.versions('a')).map((v) => v.version)).toEqual([3]);
+    // 구간은 '처음 만든 시각' 기준: 계속 쓰고 있어도 5분마다 새 칸
+    await store.pushVersion(blob('a', 4), { coalesceMs: win, now: t0 + 5 * 60_000 });
+    expect((await store.versions('a')).map((v) => v.version)).toEqual([4, 3]);
+    // 다른 기기가 만든 스냅샷은 덮어쓰지 않는다
+    await store.pushVersion({ ...blob('a', 5), deviceId: 'other' }, { coalesceMs: win, now: t0 + 5 * 60_000 + 1 });
+    await store.pushVersion(blob('a', 6), { coalesceMs: win, now: t0 + 5 * 60_000 + 2 });
+    expect((await store.versions('a')).map((v) => v.version)).toEqual([6, 5, 4, 3]);
+    // coalesceMs 없이 부르면 항상 새 칸 (동기화 엔진·되돌리기)
+    await store.pushVersion(blob('a', 7), { now: t0 + 5 * 60_000 + 3 });
+    expect(await store.versions('a')).toHaveLength(5);
+  });
+
   it('versions: 최근 20개만 유지, 최신순 조회', async () => {
     for (let v = 1; v <= 25; v++) await store.pushVersion(blob('a', v));
     const vs = await store.versions('a');
