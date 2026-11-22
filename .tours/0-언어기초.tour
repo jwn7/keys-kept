@@ -1,0 +1,55 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "0. 언어 기초 (TypeScript)",
+  "description": "이 프로젝트를 읽는 데 필요한 TypeScript 문법 8가지. Kotlin·Java와 한 줄씩 비교한다.",
+  "steps": [
+    {
+      "file": "packages/core/src/model/types.ts",
+      "pattern": "^export type Note = \\{",
+      "title": "type — 모양만 정하는 선언",
+      "description": "**개념** `type`은 객체가 어떤 필드를 갖는지만 정한다. 메서드도 생성자도 없다. 실행할 때는 사라지고 검사에만 쓰인다.\n\n**예시** `{ id: 'a1', title: '장보기', body: '우유', ... }` 처럼 그냥 객체 리터럴을 쓰면 이 타입이 된다.\n\n**언어 메모** Kotlin의 `data class Note(val id: String, ...)`, Java의 `record`에 해당한다. 다만 TS는 이름이 아니라 모양이 같으면 같은 타입으로 본다(구조적 타이핑)."
+    },
+    {
+      "file": "packages/core/src/model/types.ts",
+      "pattern": "folder: string \\| null;",
+      "title": "A | B — 둘 중 하나",
+      "description": "**개념** `|`는 '이 타입이거나 저 타입'이다. `string | null`은 글자이거나 없음.\n\n**예시** 폴더 없는 메모는 `folder: null`, 있는 메모는 `folder: '업무'`.\n\n**언어 메모** Kotlin의 `String?`와 같다. Java라면 `@Nullable String`. TS는 `null`을 확인하지 않고 쓰면 컴파일 오류를 낸다."
+    },
+    {
+      "file": "packages/core/src/model/types.ts",
+      "pattern": "\\| \\{ state: 'offline'; pending: number \\}",
+      "title": "구분 가능한 유니온 — 상태마다 다른 필드",
+      "description": "**개념** `state` 글자 값이 꼬리표 역할을 한다. `state`가 `'offline'`일 때만 `pending`이 있다.\n\n**예시** `if (s.state === 'offline') s.pending`은 되고, 확인 없이 `s.pending`은 컴파일 오류.\n\n**언어 메모** Kotlin의 `sealed class` + `when`, Java 21의 `sealed interface` + `switch`와 같은 용도다."
+    },
+    {
+      "file": "packages/core/src/crypto/kdf.ts",
+      "pattern": "^export async function deriveKey",
+      "title": "async / Promise — 나중에 끝나는 함수",
+      "description": "**개념** `async` 함수는 바로 값을 주지 않고 `Promise`(나중에 올 값)를 준다. 부르는 쪽은 `await`로 기다린다.\n\n**예시** `const key = await deriveKey('비밀번호', params)` — Argon2id가 약 1초 도는 동안 화면은 멈추지 않는다.\n\n**언어 메모** Kotlin의 `suspend fun`, Java의 `CompletableFuture`. `Promise<Uint8Array>`의 `<>`는 제네릭이고 `Uint8Array`는 Kotlin의 `ByteArray`다."
+    },
+    {
+      "file": "packages/core/src/session/VaultSession.ts",
+      "pattern": "^  private itemsKey: Uint8Array \\| null = null;",
+      "title": "class 필드와 private",
+      "description": "**개념** 클래스 안의 변수다. `private`은 클래스 밖에서 못 읽게 한다. 열쇠가 `null`이면 잠긴 상태다.\n\n**예시** 잠금 해제 직후 32바이트 배열, `lock()` 뒤에는 `null`.\n\n**언어 메모** Kotlin `private var itemsKey: ByteArray? = null`과 같다. `readonly`가 붙은 필드는 Kotlin의 `val`."
+    },
+    {
+      "file": "packages/core/src/session/VaultSession.ts",
+      "pattern": "const body = input\\.body \\?\\? prev\\?\\.body \\?\\? '';",
+      "title": "?? 와 ?. — 없을 때의 기본값",
+      "description": "**개념** `a ?? b`는 a가 `null`/`undefined`면 b. `a?.b`는 a가 없으면 오류 대신 `undefined`.\n\n**예시** 입력에 본문이 없고 이전 메모도 없으면 `''`. 입력에 없고 이전 메모에 `'우유'`가 있으면 `'우유'`.\n\n**언어 메모** Kotlin의 `?:`(엘비스)와 `?.`에 그대로 대응한다: `input.body ?: prev?.body ?: \"\"`."
+    },
+    {
+      "file": "apps/web/src/app/store.ts",
+      "pattern": "^export const useApp = create<AppState>\\(\\(set, get\\) => \\{",
+      "title": "화살표 함수와 제네릭",
+      "description": "**개념** `(set, get) => { ... }`는 이름 없는 함수다. `create<AppState>`의 `<AppState>`는 '이 저장소가 담는 모양'을 알려주는 제네릭.\n\n**예시** `set({ selectedId: 'a1' })`을 부르면 그 값만 바뀌고 화면이 다시 그려진다.\n\n**언어 메모** Kotlin 람다 `{ set, get -> ... }`와 같다. Zustand의 `create`는 Android의 `ViewModel` + `StateFlow` 자리에 있다."
+    },
+    {
+      "file": "apps/web/src/screens/Editor.tsx",
+      "pattern": "const \\[title, setTitle\\] = useState\\(''\\);",
+      "title": "구조 분해와 React 훅",
+      "description": "**개념** `useState`는 [현재 값, 값을 바꾸는 함수] 두 개를 배열로 준다. `[a, b] = ...`로 한 번에 받는다.\n\n**예시** 제목 칸에 글자를 치면 `setTitle('회의')` → 컴포넌트가 다시 실행되고 `title`이 `'회의'`가 된다.\n\n**언어 메모** Jetpack Compose의 `var title by remember { mutableStateOf(\"\") }`와 같은 역할이다. Kotlin의 `val (a, b) = pair` 구조 분해와 문법이 닮았다."
+    }
+  ]
+}

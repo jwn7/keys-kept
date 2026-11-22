@@ -23,7 +23,7 @@
 |---|---|---|---|
 | `blobs` | `id` | 암호문 레코드 (아래 `EncryptedItem`) | 잠금 중에도 유지 |
 | `outbox` | `id` | 업로드 대기 `id` + `op`(put/delete) + `queuedAt` | 온라인 시 순서대로 플러시 |
-| `versions` | `[noteId, version]` | 과거 암호문 (최근 20개) | 로컬 전용 |
+| `versions` | `++seq` (색인 `noteId`) | 과거 암호문 (최근 20개) + `savedAt`, `windowStart` | 로컬 전용. 자동 저장은 `windowStart`부터 5분 동안 같은 칸을 덮어쓴다 |
 | `meta` | `key` | `lastSyncAt`, `deviceId`, `deviceName`, `backend`, `kdfParams`, `wrappedItemsKey` | |
 
 복호화된 메모(`Note`)는 **메모리에만** (Zustand 스토어). 잠금 시 비움.
@@ -39,6 +39,7 @@ export type Note = {
   tags: string[];        // 본문 #태그 + 수동
   folder: string | null;
   pinned: boolean;
+  date?: string | null;  // 일정 날짜 YYYY-MM-DD (캘린더 보기). 암호문 안. 이전 메모에는 없음 = null
   createdAt: string;     // ISO
   updatedAt: string;     // ISO, 충돌 판정 기준
   deletedAt: string | null;
@@ -57,6 +58,8 @@ export type EncryptedItem = {
   deletedAt: string | null;
   deviceId: string;      // 마지막 수정 기기
 };
+
+// 동기화 상태: synced | syncing | offline(pending) | auth(pending, 다시 로그인 필요) | conflict | error
 
 export type ItemsKeyRecord = {
   id: string;
