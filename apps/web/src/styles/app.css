@@ -401,3 +401,26 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 @media (min-width: 768px) {
   .folder-chips, .fab-bar, .mobile-toolbar { display: none; }
 }
+
+/* ---- 오늘 화면 · 할 일 · 증명 창 (docs/KPI.md) ---- */
+.today { display: flex; flex-direction: column; gap: 20px; padding: 2px 0 24px; }
+.today-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 12px; font-size: 13px; color: var(--muted); }
+.today h2.label { font-weight: 500; letter-spacing: 0; line-height: 1.5; }
+.today div.agenda-date { padding-top: 14px; }
+.task-row { display: flex; align-items: flex-start; gap: 10px; padding: 0 12px; border-radius: var(--radius-m); }
+.task-row:hover { background: var(--fill-hover); }
+.task-row input { flex: none; width: 16px; height: 16px; margin: 11px 0 0; accent-color: var(--primary); cursor: pointer; }
+.task-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; border: 0; background: none; padding: 8px 0; text-align: left; font-size: 14px; }
+.task-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-from { font-size: 12px; color: var(--muted); }
+.quick-date { flex: none; border: 0; border-radius: 999px; padding: 3px 10px; background: var(--fill); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.quick-date:hover { background: var(--line); }
+.proof-pane { display: flex; flex-direction: column; gap: 6px; }
+.proof-plain { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-m); font-size: 14px; }
+.proof-plain span { color: var(--ink-2); font-size: 13px; }
+.proof-raw { margin: 0; padding: 12px 14px; background: var(--surface-2); border-radius: var(--radius-m); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; color: var(--ink-2); }
+.usage-value { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+@media (max-width: 767px) {
+  .task-row input { width: 20px; height: 20px; margin-top: 12px; }
+  .task-text { padding: 10px 0; font-size: 15px; }
+}

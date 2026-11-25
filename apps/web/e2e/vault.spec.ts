@@ -12,7 +12,7 @@ async function setup(page: Page) {
   await create.click();
   await expect(page.locator('.phrase-grid span')).toHaveCount(12);
   await page.getByRole('button', { name: '적어두었습니다' }).click();
-  await expect(page.getByRole('heading', { name: '모든 메모' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible(); // 첫 화면은 오늘
 }
 
 async function unlock(page: Page, password = PASSWORD) {
@@ -73,6 +73,7 @@ test('빠른 메모 → 목록, 여러 단어 검색', async ({ page }) => {
 
 test('캘린더에서 날을 고르고 빠른 메모를 넣으면 그 날짜에 놓인다', async ({ page }) => {
   await setup(page);
+  await page.locator('.sidebar').getByRole('button', { name: '모든 메모' }).click();
   await page.getByRole('button', { name: '캘린더', exact: true }).click();
   const cell = page.locator('.cal-cell:not(.out)').nth(14); // 이번 달 15일
   await cell.click();
@@ -85,6 +86,62 @@ test('캘린더에서 날을 고르고 빠른 메모를 넣으면 그 날짜에 
   await unlock(page);
   await page.locator('.cal-cell:not(.out)').nth(14).click();
   await expect(page.locator('.agenda-day .note-row')).toHaveText('치과 예약');
+});
+
+test('오늘 화면: 날짜 말은 일정이 되고, 흩어진 할 일을 모아 바로 체크한다', async ({ page }) => {
+  await setup(page);
+  const quick = page.getByLabel('빠른 메모');
+  await expect(quick).toBeFocused(); // 아무 것도 누르지 않고 바로 적는다
+
+  await quick.fill('오늘 보고서 마감');
+  await expect(page.locator('.quick-date')).toBeVisible(); // 바뀔 날짜를 미리 보여준다
+  await quick.press('Enter');
+  await expect(page.getByRole('region', { name: '오늘 일정' }).locator('.note-row')).toHaveText('보고서 마감');
+  await quick.fill('내일 치과 3시');
+  await quick.press('Enter');
+  await expect(page.getByRole('region', { name: '다가오는 일정' })).toContainText('내일');
+  await expect(page.getByRole('region', { name: '다가오는 일정' }).locator('.note-row')).toHaveText('치과 3시');
+
+  // 회의록 틀로 만든 메모의 체크박스가 할 일로 모인다
+  await page.locator('.sidebar').getByRole('button', { name: '검색과 명령' }).click();
+  await page.getByPlaceholder('메모 검색 또는 명령…').fill('회의록');
+  await page.keyboard.press('Enter');
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('\n- [ ] @민수 보고서 초안');
+  const tasks = page.getByRole('region', { name: '할 일' });
+  await expect(tasks.locator('.task-row')).toHaveCount(1);
+  await expect(tasks).toContainText('@민수 보고서 초안');
+  await tasks.getByRole('checkbox', { name: '@민수 보고서 초안' }).click();
+  await expect(tasks).toHaveCount(0); // 체크하면 목록에서 빠지고
+  await expect(page.locator('.cm-content')).toContainText('[x] @민수 보고서 초안'); // 원래 메모에 반영된다
+
+  // 편집 중에 사이드바를 눌러도 클릭이 사라지지 않는다 (누르는 순간 저장하면서 사이드바가 다시 그려진다)
+  await page.locator('.cm-content').click();
+  await page.keyboard.type(' 추가');
+  await page.locator('.sidebar').getByRole('button', { name: '모든 메모' }).click();
+  await expect(page.getByRole('heading', { name: '모든 메모' })).toBeVisible();
+});
+
+test('서버가 보는 모습에는 평문이 없고, 사용 수치는 이 기기에만 남는다', async ({ page }) => {
+  await setup(page);
+  await page.getByLabel('빠른 메모').fill('아무도 못 보는 일기');
+  await page.getByLabel('빠른 메모').press('Enter');
+  await page.locator('.note-row', { hasText: '아무도 못 보는 일기' }).click();
+  await page.getByRole('button', { name: '더 보기' }).click();
+  await page.getByRole('menuitem', { name: '서버가 보는 모습' }).click();
+  const raw = page.locator('.proof-raw');
+  await expect(raw).toContainText('"ciphertext"');
+  await expect(raw).not.toContainText('일기');
+  await page.getByRole('dialog').getByRole('button', { name: '닫기' }).click();
+
+  await page.locator('.sidebar').getByRole('button', { name: '설정' }).click();
+  const usage = page.locator('#usage');
+  await expect(usage.locator('.row', { hasText: '최근 7일 중 연 날' })).toContainText('1일');
+  await expect(usage.locator('.row', { hasText: '처음 설정하고 첫 메모까지' })).toContainText('초');
+  await expect(usage.locator('.row', { hasText: '빠른 메모로 적은 비율' })).toContainText('100%');
+  const stored = await page.evaluate(() => localStorage.getItem('vault.metrics') ?? '');
+  expect(stored).not.toContain('일기'); // 개수와 시각만
 });
 
 test('휴지통으로 보낸 뒤 되돌리기', async ({ page }) => {

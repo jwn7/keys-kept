@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { extractTags, type Note } from '@vault/core';
 import { registerEditorFlush, useApp } from '../app/store';
 import { ui } from '../app/ui';
@@ -8,6 +8,8 @@ import { createMarkdownEditor, type EditorHandle } from '../editor/markdownEdito
 import { LockIcon } from '../components/Icons';
 import { useBacklinks, useNoteActions } from './MainScreen';
 import { VersionHistory } from './VersionHistory';
+import { ServerView } from './ServerView';
+import { relatedNotes } from '../app/assist';
 
 /** 입력 후 1초 디바운스 → 로컬 암호화 저장 → outbox (SPEC §2.1) */
 const DEBOUNCE_MS = 1000;
@@ -28,6 +30,8 @@ export function Editor() {
   const note = notes.find((n) => n.id === selectedId) ?? trash.find((n) => n.id === selectedId) ?? null;
   const inTrash = !!note && note.deletedAt !== null;
   const backlinks = useBacklinks(selectedId);
+  // 태그나 제목이 겹치는 메모. 이미 링크로 이어진 것은 위에 나오므로 뺀다.
+  const related = useMemo(() => (note && !inTrash ? relatedNotes(note, notes).filter((r) => !backlinks.some((b) => b.id === r.id)) : []), [note, notes, backlinks, inTrash]);
 
   const [title, setTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>('saved');
@@ -258,6 +262,14 @@ export function Editor() {
               ))}
             </div>
           )}
+          {related.length > 0 && (
+            <div className="backlinks">
+              <span className="muted">{ko.editor.related}</span>
+              {related.map((r) => (
+                <button key={r.id} type="button" onClick={() => void flush().then(() => select(r.id))}>{displayTitle(r)}</button>
+              ))}
+            </div>
+          )}
           <div className="save-state">
             <span className={saveState === 'error' ? 'save-error' : undefined} role="status">
               {(saveState === 'saved' || saveState === 'saving') && <span className="tick" aria-hidden="true">✓ </span>}
@@ -309,6 +321,7 @@ function NoteMenu({ note, onFlush }: { note: Note; onFlush: () => Promise<void> 
   const app = useApp((s) => s.app);
   const select = useApp((s) => s.select);
   const [open, setOpen] = useState(false);
+  const [proof, setProof] = useState(false);
   const wrapRef = useRef<HTMLSpanElement>(null);
 
   // 바깥을 누르거나 Esc를 누르면 닫는다
@@ -366,9 +379,11 @@ function NoteMenu({ note, onFlush }: { note: Note; onFlush: () => Promise<void> 
         <div role="menu" className="menu">
           <button type="button" role="menuitem" onClick={() => void act(() => app.session.save({ id: note.id, pinned: !note.pinned }))}>{note.pinned ? ko.editor.unpin : ko.editor.pin}</button>
           <button type="button" role="menuitem" onClick={() => void act(moveFolder)}>{ko.editor.moveFolder}</button>
+          <button type="button" role="menuitem" onClick={() => void act(async () => setProof(true))}>{ko.editor.serverView}</button>
           <button type="button" role="menuitem" className="danger" onClick={() => void act(toTrash)}>{ko.editor.delete}</button>
         </div>
       )}
+      {proof && <ServerView note={note} onClose={() => setProof(false)} />}
     </span>
   );
 }

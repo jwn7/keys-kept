@@ -6,6 +6,7 @@ import { pickFile, relTime } from '../app/util';
 import { usePasswordScore } from '../app/strength';
 import { GOOGLE_CLIENT_ID } from '../app/session';
 import { evaluatePasskey } from '../app/passkey';
+import { markInstalled, markUnlock } from '../app/metrics';
 import { Logo, Seal } from '../components/Seal';
 
 type Mode = 'password' | 'recovery' | 'restore';
@@ -101,6 +102,7 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
     try {
       const secret = await evaluatePasskey(passkey.credentialId, passkey.prfSalt);
       await app.session.unlockWithDeviceSecret(secret);
+      markUnlock('passkey');
       secret.fill(0);
     } catch {
       setError(ko.unlock.passkeyFailed);
@@ -116,6 +118,7 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
     setError(null);
     try {
       await app.session.unlock(pw);
+      markUnlock('password');
       setPw('');
     } catch (err) {
       if (err instanceof WrongPasswordError) setError(ko.unlock.wrong);
@@ -167,6 +170,7 @@ function RecoveryCard({ onBack }: { onBack: () => void }) {
     setError(null);
     try {
       await app.session.resetPasswordWithRecovery(words, pw);
+      markUnlock('recovery');
     } catch (err) {
       setError(err instanceof WrongPasswordError ? ko.unlock.recoveryWrong : String(err));
     } finally {
@@ -273,7 +277,10 @@ function SetupCard({ onRestore }: { onRestore: () => void }) {
     }
   };
 
-  if (phrase) return <PhraseView phrase={phrase} step={ko.setup.step(2, 2)} onAck={() => useApp.getState().setScreen('main')} />;
+  if (phrase) return <PhraseView phrase={phrase} step={ko.setup.step(2, 2)} onAck={() => {
+    markInstalled(); // 복구 키를 적은 뒤부터 잰다: 첫 메모까지 걸린 시간 (docs/KPI.md)
+    useApp.getState().setScreen('main');
+  }} />;
 
   return (
     <form className="unlock-card" onSubmit={submit}>

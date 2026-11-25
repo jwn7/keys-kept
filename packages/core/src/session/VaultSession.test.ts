@@ -195,6 +195,17 @@ describe('VaultSession', () => {
     await expect(s.unlockWithDeviceSecret(secret)).rejects.toThrow();
   });
 
+  it('rawItem: 디스크·서버에 있는 모습 그대로(암호문)를 돌려준다', async () => {
+    const s = make();
+    await s.setup('pw');
+    const n = await s.save({ title: '비밀 제목', body: '비밀 본문 #태그' });
+    const raw = await s.rawItem(n.id);
+    expect(raw).toMatchObject({ id: n.id, type: 'note', version: 1, deletedAt: null });
+    expect(JSON.stringify(raw)).not.toContain('비밀');
+    expect(JSON.stringify(raw)).not.toContain('태그');
+    expect(await s.rawItem('없는 id')).toBeUndefined();
+  });
+
   it('sealLocal/openLocal: 이 기기에만 두는 설정값을 itemsKey로 잠근다 (잠겨 있으면 못 연다)', async () => {
     const s = make();
     await s.setup('pw');

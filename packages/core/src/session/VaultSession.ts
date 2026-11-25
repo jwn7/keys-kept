@@ -437,6 +437,12 @@ export class VaultSession {
     return r;
   }
 
+  /** 이 메모가 디스크와 서버에 저장된 모습 그대로(암호문). "서버가 보는 모습" 화면용. */
+  async rawItem(id: string): Promise<EncryptedItem | undefined> {
+    this.requireUnlocked();
+    return this.store.getBlob(id);
+  }
+
   /** 과거 버전(암호문)을 복호화해 돌려준다. 최신순. */
   async history(id: string): Promise<{ version: number; savedAt: string; note: Note }[]> {
     const itemsKey = this.requireUnlocked();

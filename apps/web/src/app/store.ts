@@ -3,8 +3,9 @@ import type { Note, SyncStatus } from '@vault/core';
 import type { AppSession } from './session';
 import { createAppSession } from './session';
 import { runAutoBackup } from './autoBackup';
+import { markOpen } from './metrics';
 
-export type Filter = { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
+export type Filter = { kind: 'today' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
 export type SortKey = 'updated' | 'created' | 'title';
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 's' | 'm' | 'l';
@@ -81,6 +82,7 @@ export const useApp = create<AppState>((set, get) => {
       set({ ...pull(), screen, selectedId: e.locked ? null : get().selectedId, paletteOpen: false });
       if (e.locked) app.scheduler.stop();
       else {
+        markOpen();
         void app.session.purgeExpiredTrash(); // 휴지통 30일 정리 (SPEC §3.1)
         // 자동 로컬 백업: 오늘 아직 안 했으면 조용히 한 번 (폴더를 정해 둔 경우에만)
         setTimeout(() => {
@@ -107,7 +109,7 @@ export const useApp = create<AppState>((set, get) => {
     trash: [],
     status: app.backendKind !== 'memory' ? { state: 'offline', pending: 0 } : { state: 'synced', at: '' },
     selectedId: null,
-    filter: { kind: 'all' },
+    filter: { kind: 'today' }, // 첫 화면은 오늘 (docs/KPI.md)
     query: '',
     paletteOpen: false,
     mobileView: 'list',

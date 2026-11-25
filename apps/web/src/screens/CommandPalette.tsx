@@ -35,6 +35,9 @@ export function CommandPalette() {
     const all: Item[] = [
       { id: 'new', kind: 'cmd', label: ko.palette.cmd.newNote, key: 'Alt N', run: () => void actions.newNote() },
       { id: 'today', kind: 'cmd', label: ko.palette.cmd.today, key: 'Ctrl D', run: () => void actions.today() },
+      { id: 'plan', kind: 'cmd', label: ko.palette.cmd.plan, run: () => void actions.template('plan') },
+      { id: 'meeting', kind: 'cmd', label: ko.palette.cmd.meeting, run: () => void actions.template('meeting') },
+      { id: 'study', kind: 'cmd', label: ko.palette.cmd.study, run: () => void actions.template('study') },
       { id: 'sync', kind: 'cmd', label: ko.palette.cmd.sync, run: () => void actions.syncNow() },
       {
         id: 'backup',

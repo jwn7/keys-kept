@@ -31,9 +31,10 @@ async function seed(page) {
   await page.locator('.list-title-row').getByRole('button', { name: '새 메모' }).click();
   await page.getByLabel('메모 제목').fill('주간 회의');
   await page.locator('.cm-content').click();
-  await page.keyboard.type('## 이번 주\n\n- [x] 디자인 검토\n- [ ] 배포 일정 확정\n- [ ] 회고 문서 쓰기\n\n다음 주까지 #업무 정리. 관련 메모는 [[사이드 프로젝트 아이디어]]\n\n> 결정은 짧게, 기록은 남기기');
+  await page.keyboard.type('## 이번 주\n\n- [x] 디자인 검토\n배포 일정 확정\n회고 문서 쓰기\n\n다음 주까지 #업무 정리. 관련 메모는 [[사이드 프로젝트 아이디어]]\n\n> 결정은 짧게, 기록은 남기기\n\n## 할 일\n- [ ] @민수 발표 자료 보내기');
   await page.waitForTimeout(1500);
   // 일정
+  await page.locator('.sidebar').getByRole('button', { name: '모든 메모' }).click();
   await page.getByRole('button', { name: '캘린더', exact: true }).click();
   for (const [offset, text] of [[0, '보고서 마감'], [2, '치과 예약 3시'], [2, '엄마 생일 선물'], [5, '기말 발표 준비'], [9, '이사 견적'], [-3, '독서 모임']]) {
     const cell = page.locator(`[data-day="${day(offset)}"]`);
@@ -57,6 +58,15 @@ const browser = await chromium.launch({ channel: 'chrome' });
   await page.goto('http://localhost:5173/');
   await shot(page, 'pc-1-setup');
   await seed(page);
+  await page.locator('.sidebar').getByRole('button', { name: '오늘' }).first().click();
+  await shot(page, 'pc-0-today');
+  await page.locator('.note-row', { hasText: '주간 회의' }).click();
+  await page.getByRole('button', { name: '더 보기' }).click();
+  await page.getByRole('menuitem', { name: '서버가 보는 모습' }).click();
+  await shot(page, 'pc-0-proof');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '모든 메모' }).first().click();
+  await page.getByRole('button', { name: '캘린더', exact: true }).click();
   await page.locator(`[data-day="${day(2)}"]`).click();
   await shot(page, 'pc-4-calendar');
   await page.locator('.agenda-day .note-row').first().click();
@@ -94,7 +104,12 @@ const browser = await chromium.launch({ channel: 'chrome' });
     await quick.fill(t);
     await quick.press('Enter');
   }
+  await quick.fill('내일 치과 3시');
+  await shot(page, 'm-0-quick-date');
+  await quick.press('Enter');
   await page.waitForTimeout(400);
+  await shot(page, 'm-0-today');
+  await page.getByRole('button', { name: '모든 메모' }).first().click();
   await shot(page, 'm-2-list');
   await page.getByRole('button', { name: '캘린더', exact: true }).click();
   await page.locator(`[data-day="${day(0)}"]`).click();

@@ -13,6 +13,7 @@ import { createPasskey, passkeySupported } from '../app/passkey';
 import { autoBackupSupported, backupFolder, disableAutoBackup, enableAutoBackup, folderPermission, runAutoBackup } from '../app/autoBackup';
 import { BackIcon } from '../components/Icons';
 import { RestoreCard } from './UnlockScreen';
+import { loadMetrics, summarize } from '../app/metrics';
 
 const S = ko.settings;
 
@@ -58,6 +59,7 @@ export function SettingsScreen() {
           <SecuritySection />
           <DataSection />
           <LookSection />
+          <UsageSection />
         </div>
         </div>
       </div>
@@ -480,6 +482,36 @@ function DataSection() {
       <div className="row"><span>{S.data.importMd}</span><button type="button" className="btn btn-sm" onClick={() => void importMd()}>{S.data.import}</button></div>
       {msg && <p className="small" style={{ color: 'var(--ok)' }}>{msg}</p>}
       <div className="row"><span>{S.data.deleteAll} <span className="muted">({S.data.deleteAllHint})</span></span><button type="button" className="btn btn-sm btn-danger" onClick={() => void deleteAll()}>{S.data.deleteBtn}</button></div>
+    </section>
+  );
+}
+
+/** 이 기기에서만 센 사용 수치 (docs/KPI.md). 보내지 않고, 사용자가 원할 때만 복사해 건넨다. */
+function UsageSection() {
+  const U = S.usage;
+  const s = summarize(loadMetrics(), Date.now());
+  const rows: [string, string][] = [
+    [U.firstNote, s.firstNoteSec === null ? U.none : U.seconds(s.firstNoteSec)],
+    [U.capture, s.captureSec === null ? U.none : U.seconds(s.captureSec)],
+    [U.active7, U.days(s.active7)],
+    [U.active28, U.days(s.active28)],
+    [U.passkey, s.passkeyShare === null ? U.none : U.percent(s.passkeyShare)],
+    [U.quick, s.quickShare === null ? U.none : U.percent(s.quickShare)],
+  ];
+  const copy = () => void navigator.clipboard.writeText(JSON.stringify(s)).then(() => ui.toast(ko.common.copied));
+  return (
+    <section id="usage" className="card">
+      <h2>{S.nav.usage}</h2>
+      {rows.map(([label, value]) => (
+        <div key={label} className="row">
+          <span>{label}</span>
+          <span className="usage-value">{value}</span>
+        </div>
+      ))}
+      <div className="row">
+        <span className="small muted">{U.local}</span>
+        <button type="button" className="btn btn-sm" onClick={copy}>{U.copy}</button>
+      </div>
     </section>
   );
 }

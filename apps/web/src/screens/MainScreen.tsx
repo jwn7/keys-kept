@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Note } from '@vault/core';
+import { extractTags, type Note } from '@vault/core';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
 import { BackIcon, CalendarIcon, FolderIcon, GearIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
-import { CalendarView, CardGrid, NoteRow, QuickAdd } from './NoteViews';
+import { CalendarView, CardGrid, NoteRow, QuickAdd, TodayView } from './NoteViews';
+import { markCapture } from '../app/metrics';
 import { Logo } from '../components/Seal';
 import { Editor } from './Editor';
 import { CommandPalette } from './CommandPalette';
@@ -19,6 +20,7 @@ export function useFilteredNotes(): Note[] {
   return useMemo(() => {
     let list: Note[];
     switch (filter.kind) {
+      case 'today':
       case 'all':
         list = notes;
         break;
@@ -56,10 +58,12 @@ export function useNoteActions() {
   const select = useApp((s) => s.select);
   const setFilter = useApp((s) => s.setFilter);
   return {
-    async newNote(initial?: Partial<Pick<Note, 'title' | 'body' | 'folder'>>) {
+    async newNote(initial?: Partial<Pick<Note, 'title' | 'body' | 'folder' | 'date'>>) {
       const filter = useApp.getState().filter;
       const folder = initial?.folder ?? (filter.kind === 'folder' ? filter.folder : null);
-      const n = await app.session.save({ title: initial?.title ?? '', body: initial?.body ?? '', folder });
+      const body = initial?.body ?? '';
+      markCapture('new');
+      const n = await app.session.save({ title: initial?.title ?? '', body, folder, date: initial?.date ?? null, tags: extractTags(body) });
       if (filter.kind === 'trash') setFilter({ kind: 'all' });
       select(n.id);
       return n;
@@ -74,6 +78,12 @@ export function useNoteActions() {
     },
     async today() {
       return this.openByTitle(todayTitle());
+    },
+    /** 틀에서 새 메모: 회의록(누가 무엇을), 하루 계획(오늘 일정으로), 학습 노트(#복습 → 다시 볼 메모) */
+    async template(kind: keyof typeof ko.templates) {
+      const now = new Date();
+      const t = ko.templates[kind];
+      return this.newNote({ title: t.title(ko.time.date(now.getMonth() + 1, now.getDate())), body: t.body, date: kind === 'plan' ? todayTitle(now) : null });
     },
     lock() {
       void lockNow(); // 미저장 입력을 먼저 저장한 뒤 잠근다
@@ -93,6 +103,7 @@ export function MainScreen() {
   const selectedId = useApp((s) => s.selectedId);
   const editing = useApp((s) => s.editing);
   const view = useApp((s) => s.view);
+  const isToday = useApp((s) => s.filter.kind === 'today');
   const actions = useNoteActions();
 
   // 전역 단축키 (SPEC §2.3)
@@ -179,13 +190,29 @@ export function MainScreen() {
           )}
         </div>
       </header>
-      <div className="columns" data-view={mobileView} data-mode={view} data-selected={selectedId ? 'true' : 'false'}>
+      <div className="columns" data-view={mobileView} data-mode={isToday ? 'list' : view} data-selected={selectedId ? 'true' : 'false'}>
         <Sidebar />
         <NoteList />
         <Editor />
       </div>
       {paletteOpen && <CommandPalette />}
     </div>
+  );
+}
+
+/**
+ * 사이드바 항목. Sidebar 안에서 정의하면 Sidebar가 다시 그려질 때마다 버튼이 새로 만들어져,
+ * 편집 중에 누른 클릭(누르는 순간 저장 → 다시 그림)이 사라진다. 그래서 바깥에 둔다.
+ */
+function Item({ f, label, count, icon }: { f: Filter; label: string; count?: number | undefined; icon: ReactNode }) {
+  const current = useApp((s) => JSON.stringify(s.filter) === JSON.stringify(f));
+  const setFilter = useApp((s) => s.setFilter);
+  return (
+    <button type="button" className="nav-item" aria-current={current ? 'true' : undefined} onClick={() => setFilter(f)}>
+      {icon}
+      <span>{label}</span>
+      {count !== undefined && <span className="count">{count}</span>}
+    </button>
   );
 }
 
@@ -210,14 +237,6 @@ function Sidebar() {
     for (const n of notes) for (const t of n.tags) m.set(t, (m.get(t) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
   }, [notes]);
-  const is = (f: Filter) => JSON.stringify(f) === JSON.stringify(filter);
-  const Item = ({ f, label, count, icon }: { f: Filter; label: string; count?: number | undefined; icon: ReactNode }) => (
-    <button type="button" className="nav-item" aria-current={is(f) ? 'true' : undefined} onClick={() => setFilter(f)}>
-      {icon}
-      <span>{label}</span>
-      {count !== undefined && <span className="count">{count}</span>}
-    </button>
-  );
   const now = new Date();
   return (
     <nav className="sidebar" aria-label={ko.main.folders}>
@@ -229,13 +248,13 @@ function Sidebar() {
         <span>{ko.main.search}</span>
         <kbd>Ctrl K</kbd>
       </button>
-      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.length} icon={<NotesIcon />} />
-      <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} icon={<CalendarIcon />} />
-      <button type="button" className="nav-item" onClick={() => void actions.today()} title="Ctrl+D">
+      <button type="button" className="nav-item" aria-current={filter.kind === 'today' ? 'true' : undefined} onClick={() => setFilter({ kind: 'today' })}>
         <TodayIcon />
-        <span>{ko.main.today}</span>
+        <span>{ko.main.home}</span>
         <span className="count">{ko.time.date(now.getMonth() + 1, now.getDate())}</span>
       </button>
+      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.length} icon={<NotesIcon />} />
+      <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} icon={<CalendarIcon />} />
       {folders.named.length > 0 && <div className="label">{ko.main.folders}</div>}
       {folders.named.map(([f, c]) => (
         <Item key={f} f={{ kind: 'folder', folder: f }} label={f} count={c} icon={<FolderIcon />} />
@@ -289,8 +308,10 @@ function NoteList() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
   }, [notes]);
   const title =
-    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : ko.main.allNotes;
+    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : ko.main.allNotes;
   const inTrash = filter.kind === 'trash';
+  const isToday = filter.kind === 'today';
+  const home = isToday || filter.kind === 'all';
 
   return (
     <section className="list" aria-label={title}>
@@ -305,6 +326,7 @@ function NoteList() {
         </div>
         {!inTrash && <QuickAdd />}
         <div className="folder-chips">
+          <button type="button" aria-pressed={isToday} onClick={() => setFilter({ kind: 'today' })}>{ko.main.home}</button>
           <button type="button" aria-pressed={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })}>{ko.main.allNotes}</button>
           <button type="button" aria-pressed={filter.kind === 'dated'} onClick={() => setFilter({ kind: 'dated' })}>{ko.main.dated}</button>
           {folders.map((f) => (
@@ -315,7 +337,7 @@ function NoteList() {
           ))}
           <button type="button" aria-pressed={inTrash} onClick={() => setFilter({ kind: 'trash' })}>{ko.main.trash}</button>
         </div>
-        <div className="list-head">
+        {!isToday && <div className="list-head">
           <div className="segment" role="group" aria-label={ko.main.viewLabel}>
             {(['list', 'cards', 'calendar'] as const).map((v) => (
               <button key={v} type="button" aria-pressed={view === v} onClick={() => setPref('view', v)}>{ko.main.views[v]}</button>
@@ -332,16 +354,18 @@ function NoteList() {
             </label>
           )}
           <span className="list-count">{ko.main.count(list.length)}</span>
-        </div>
+        </div>}
       </div>
       <div className="list-scroll">
         {inTrash && list.length > 0 && <p className="small muted" style={{ padding: '10px 16px 0' }}>{ko.main.trashHint}</p>}
-        {view === 'calendar' && !inTrash ? (
+        {isToday && notes.length > 0 ? (
+          <TodayView now={now} onDaily={() => void actions.today()} />
+        ) : view === 'calendar' && !inTrash && !isToday ? (
           <CalendarView list={list} now={now} />
         ) : list.length === 0 ? (
           <div className="empty">
-            <span>{notes.length === 0 && filter.kind === 'all' ? ko.main.emptyList : ko.main.emptyFilter}</span>
-            {notes.length === 0 && filter.kind === 'all' ? (
+            <span>{notes.length === 0 && home ? ko.main.emptyList : ko.main.emptyFilter}</span>
+            {notes.length === 0 && home ? (
               <button type="button" className="btn btn-sm" onClick={() => void actions.newNote()}>{ko.main.firstNote}</button>
             ) : (
               (filter.kind !== 'all' || query) && (

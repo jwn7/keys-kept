@@ -1,6 +1,8 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { isConflictCopy, type Note } from '@vault/core';
-import { useApp } from '../app/store';
+import { flushEditor, useApp } from '../app/store';
+import { checkTask, openTasks, parseQuickDate, reviewDue, type Task } from '../app/assist';
+import { markCapture } from '../app/metrics';
 import { ko } from '../i18n/ko';
 import { dayKey, displayTitle, formatDay, monthGrid, noteDay, relTime, snippet } from '../app/util';
 import { PinIcon } from '../components/Icons';
@@ -8,6 +10,7 @@ import { PinIcon } from '../components/Icons';
 /**
  * 빠른 메모: 한 줄 쓰고 Enter → 새 메모 (편집기로 넘어가지 않고 계속 적을 수 있다).
  * 캘린더에서 고른 날이 있으면 그 날짜의 일정으로 만든다. Shift+Enter는 만들고 바로 연다.
+ * "내일 치과 3시"처럼 앞뒤에 날짜 말이 있으면 날짜로 바꾼다. 바뀔 날짜를 칩으로 미리 보여주고, 칩을 누르면 뺀다.
  */
 export function QuickAdd() {
   const app = useApp((s) => s.app);
@@ -15,17 +18,27 @@ export function QuickAdd() {
   const calDay = useApp((s) => s.calDay);
   const filter = useApp((s) => s.filter);
   const [text, setText] = useState('');
-  const date = view === 'calendar' ? calDay : null;
+  const [noDate, setNoDate] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const date = view === 'calendar' && filter.kind !== 'today' ? calDay : null;
+  const parsed = useMemo(() => (date || noDate ? null : parseQuickDate(text, new Date())), [text, date, noDate]);
+  // 잠금을 풀면 아무 것도 누르지 않고 바로 적을 수 있게 (PC만. 모바일에서는 키보드가 화면을 가린다)
+  useEffect(() => {
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches && !useApp.getState().selectedId) inputRef.current?.focus();
+  }, []);
   const add = async (open: boolean) => {
     const t = text.trim();
     if (!t) return;
-    const [first, ...rest] = t.split('\n');
+    const when = parsed?.date ?? date;
+    const [first, ...rest] = (parsed?.date ? parsed.text : t).split('\n');
     // 저장을 기다리기 전에 칸부터 비운다. 저장이 끝난 뒤에 비우면 그 사이에 친 다음 메모가 같이 지워진다.
     setText('');
+    setNoDate(false);
+    markCapture('quick');
     const n = await app.session.save({
       title: first ?? '',
       body: rest.join('\n'),
-      date,
+      date: when,
       folder: filter.kind === 'folder' ? filter.folder : null,
     });
     if (app.backendKind !== 'memory') app.scheduler.requestNow();
@@ -41,12 +54,21 @@ export function QuickAdd() {
     <div className="quick-add">
       <span className="quick-plus" aria-hidden="true">+</span>
       <input
+        ref={inputRef}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (!e.target.value) setNoDate(false);
+        }}
         onKeyDown={onKey}
         placeholder={date ? ko.quick.placeholderOn(formatDay(date)) : ko.quick.placeholder}
         aria-label={ko.quick.label}
       />
+      {parsed?.date && (
+        <button type="button" className="quick-date" title={ko.quick.dateCancel(formatDay(parsed.date))} aria-label={ko.quick.dateCancel(formatDay(parsed.date))} onClick={() => setNoDate(true)}>
+          {formatDay(parsed.date)} <span aria-hidden="true">×</span>
+        </button>
+      )}
       {text && (
         <button type="button" className="clear" aria-label={ko.common.clear} onClick={() => setText('')}>
           ×
@@ -126,6 +148,107 @@ function upcomingGroups(byDay: Map<string, Note[]>, today: string, skip: string 
     if (items && k !== skip) out.push([k, items]);
   }
   return out;
+}
+
+const MAX_TASKS = 8;
+
+/**
+ * 오늘 화면: 열자마자 "오늘 뭐가 있고, 뭘 해야 하고, 뭘 다시 봐야 하나"가 보이게 한다.
+ * 한 메모는 한 묶음에만 나온다 (위 묶음이 우선).
+ */
+export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }) {
+  const app = useApp((s) => s.app);
+  const notes = useApp((s) => s.notes);
+  const select = useApp((s) => s.select);
+  const setFilter = useApp((s) => s.setFilter);
+  const today = dayKey(new Date(now));
+  const v = useMemo(() => {
+    const byDay = new Map<string, Note[]>();
+    for (const n of notes) {
+      const k = noteDay(n, 'date');
+      if (k) byDay.set(k, [...(byDay.get(k) ?? []), n]);
+    }
+    const todays = byDay.get(today) ?? [];
+    const upcoming = upcomingGroups(byDay, today, today, 8);
+    const shown = new Set([...todays, ...upcoming.flatMap(([, items]) => items)].map((n) => n.id));
+    const take = (list: Note[]) => {
+      const out = list.filter((n) => !shown.has(n.id));
+      for (const n of out) shown.add(n.id);
+      return out;
+    };
+    const review = take(reviewDue(notes, today));
+    const pinned = take(notes.filter((n) => n.pinned));
+    const recent = take([...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter((n) => !shown.has(n.id)).slice(0, 6));
+    return { todays, upcoming, review, pinned, recent, tasks: openTasks(notes), rest: notes.length - shown.size };
+  }, [notes, today]);
+  const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
+  const tomorrow = dayKey(new Date(ty, tm - 1, td + 1));
+
+  const done = async (t: Task) => {
+    await flushEditor(); // 열려 있는 메모에 아직 저장 안 된 입력이 있으면 먼저 저장한다
+    const cur = useApp.getState().notes.find((n) => n.id === t.noteId);
+    if (!cur) return;
+    await app.session.save({ id: cur.id, body: checkTask(cur.body, t.line) });
+    if (app.backendKind !== 'memory') app.scheduler.requestNow();
+  };
+  const Group = ({ label, list }: { label: string; list: Note[] }) =>
+    list.length === 0 ? null : (
+      <section aria-label={label}>
+        <h2 className="label agenda-label">{label}</h2>
+        {list.map((n) => (
+          <NoteRow key={n.id} n={n} now={now} />
+        ))}
+      </section>
+    );
+
+  return (
+    <div className="today">
+      <div className="today-head">
+        <span>{formatDay(today)}</span>
+        <button type="button" className="btn-link" onClick={onDaily} title="Ctrl+D">{ko.main.today}</button>
+      </div>
+      <section aria-label={ko.main.todaySchedule}>
+        <h2 className="label agenda-label">{ko.main.todaySchedule}</h2>
+        {v.todays.length === 0 ? <p className="agenda-empty">{ko.cal.emptyDay}</p> : v.todays.map((n) => <NoteRow key={n.id} n={n} now={now} hideDate />)}
+      </section>
+      {v.tasks.length > 0 && (
+        <section aria-label={ko.main.tasks}>
+          <h2 className="label agenda-label">{ko.main.tasks}</h2>
+          {v.tasks.slice(0, MAX_TASKS).map((t) => (
+            <div key={`${t.noteId}:${t.line}`} className="task-row">
+              <input type="checkbox" checked={false} aria-label={t.text} onChange={() => void done(t)} />
+              <button type="button" className="task-text" onClick={() => select(t.noteId)}>
+                <span>{t.text}</span>
+                <span className="task-from">{[t.noteTitle || ko.main.untitled, t.date && (t.date === today ? ko.cal.today : formatDay(t.date))].filter(Boolean).join(' · ')}</span>
+              </button>
+            </div>
+          ))}
+          {v.tasks.length > MAX_TASKS && <p className="agenda-empty">{ko.main.moreTasks(v.tasks.length - MAX_TASKS)}</p>}
+        </section>
+      )}
+      {v.upcoming.length > 0 && (
+        <section aria-label={ko.cal.upcoming}>
+          <h2 className="label agenda-label">{ko.cal.upcoming}</h2>
+          {v.upcoming.map(([k, items]) => (
+            <div key={k} className="agenda-group">
+              <div className="agenda-date">{k === tomorrow ? ko.cal.tomorrow : formatDay(k)}</div>
+              <div className="agenda-items">
+                {items.map((n) => (
+                  <NoteRow key={n.id} n={n} now={now} hideDate />
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      <Group label={ko.main.review} list={v.review} />
+      <Group label={ko.main.pinnedSection} list={v.pinned} />
+      <Group label={ko.main.recent} list={v.recent} />
+      {v.rest > 0 && (
+        <button type="button" className="btn-link muted agenda-undated" onClick={() => setFilter({ kind: 'all' })}>{ko.main.seeAll(notes.length)}</button>
+      )}
+    </div>
+  );
 }
 
 /**

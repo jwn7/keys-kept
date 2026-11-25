@@ -11,7 +11,7 @@ async function setup(page: Page) {
   await expect(create).toBeEnabled();
   await create.click();
   await page.getByRole('button', { name: '적어두었습니다' }).click();
-  await expect(page.getByRole('heading', { name: '모든 메모' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible(); // 첫 화면은 오늘
 }
 
 test('패스키로 잠금 해제 (가상 인증기, WebAuthn PRF)', async ({ page }) => {
