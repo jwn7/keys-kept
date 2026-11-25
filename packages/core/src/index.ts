@@ -23,3 +23,7 @@ export type { MarkdownFile } from './backup/markdownImport';
 export { VaultSession, LockedError, VaultMismatchError, WrongPasswordError, NotSetUpError, extractTags, isConflictCopy } from './session/VaultSession';
 export type { VaultSessionOptions, NoteInput, SessionEvent } from './session/VaultSession';
 export type { DeviceUnlockRecord } from './store/LocalStore';
+export { detectKey, isPublicEnvName, publicNameWarning } from './secrets/detect';
+export type { KeyDetection, KeyExposure, KeyMode } from './secrets/detect';
+export { parseEnv, formatEnv } from './secrets/envfile';
+export type { EnvEntry } from './secrets/envfile';
