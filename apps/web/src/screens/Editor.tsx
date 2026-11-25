@@ -162,9 +162,14 @@ export function Editor() {
   if (!note) {
     return (
       <main className="editor">
-        <div className="empty" style={{ margin: 'auto' }}>
-          <span>{ko.main.noSelection}</span>
-          <button type="button" className="btn btn-sm" onClick={() => void actions.newNote()}>{ko.main.newNote}</button>
+        {/* 빈 화면은 다음 행동을 알려주는 자리: 자주 쓰는 세 가지와 단축키 */}
+        <div className="editor-empty">
+          <p>{ko.main.noSelection}</p>
+          <div className="hint-list">
+            <button type="button" onClick={() => void actions.newNote()}><span>{ko.main.hintNew}</span><kbd>Alt N</kbd></button>
+            <button type="button" onClick={() => useApp.getState().setPalette(true)}><span>{ko.main.hintSearch}</span><kbd>Ctrl K</kbd></button>
+            <button type="button" onClick={() => void actions.today()}><span>{ko.main.hintToday}</span><kbd>Ctrl D</kbd></button>
+          </div>
         </div>
       </main>
     );

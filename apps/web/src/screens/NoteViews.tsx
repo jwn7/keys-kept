@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { isConflictCopy, type Note } from '@vault/core';
 import { useApp } from '../app/store';
-import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
 import { dayKey, displayTitle, formatDay, monthGrid, noteDay, relTime, snippet } from '../app/util';
 import { PinIcon } from '../components/Icons';
@@ -30,8 +29,8 @@ export function QuickAdd() {
       folder: filter.kind === 'folder' ? filter.folder : null,
     });
     if (app.backendKind !== 'memory') app.scheduler.requestNow();
+    // 추가한 메모가 목록·캘린더에 바로 나타나는 것이 피드백이다. 알림을 따로 띄우지 않는다.
     if (open) useApp.getState().select(n.id);
-    else ui.toast(date ? ko.quick.addedOn(formatDay(date)) : ko.quick.added);
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
@@ -63,7 +62,8 @@ export function DateChip({ date }: { date: string | null | undefined }) {
   return <span className={`date-chip${date === today ? ' today' : ''}`}>{date === today ? ko.cal.today : formatDay(date)}</span>;
 }
 
-export function NoteRow({ n, now }: { n: Note; now: number }) {
+/** hideDate: 일정 목록 안에서는 날짜가 이미 묶음 제목에 있으므로 날짜 칩과 수정 시각을 숨긴다 */
+export function NoteRow({ n, now, hideDate }: { n: Note; now: number; hideDate?: boolean }) {
   const selectedId = useApp((s) => s.selectedId);
   const select = useApp((s) => s.select);
   return (
@@ -78,12 +78,12 @@ export function NoteRow({ n, now }: { n: Note; now: number }) {
           )}
           {displayTitle(n)}
         </span>
-        <time dateTime={n.updatedAt}>{relTime(n.updatedAt, now)}</time>
+        {!hideDate && <time dateTime={n.updatedAt}>{relTime(n.updatedAt, now)}</time>}
       </div>
       {snippet(n.body) && <div className="s">{snippet(n.body)}</div>}
-      {(n.date || isConflictCopy(n)) && (
+      {((n.date && !hideDate) || isConflictCopy(n)) && (
         <div className="row-meta">
-          <DateChip date={n.date} />
+          {!hideDate && <DateChip date={n.date} />}
           {isConflictCopy(n) && <span className="conflict-flag">{n.title.slice(n.title.indexOf('(충돌 사본') + 1, -1)}</span>}
         </div>
       )}
@@ -116,7 +116,22 @@ export function CardGrid({ list }: { list: Note[] }) {
   );
 }
 
-/** 월 캘린더. 날을 누르면 그 날의 메모가 아래에 나오고, 빠른 메모가 그 날짜로 들어간다. */
+/** 앞으로 며칠치 일정을 날짜별로 묶는다 (오늘 포함, 고른 날은 위에서 따로 보여주므로 뺀다). */
+function upcomingGroups(byDay: Map<string, Note[]>, today: string, skip: string | null, days = 30): [string, Note[]][] {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+  const out: [string, Note[]][] = [];
+  for (let i = 0; i < days; i++) {
+    const k = dayKey(new Date(y, m - 1, d + i));
+    const items = byDay.get(k);
+    if (items && k !== skip) out.push([k, items]);
+  }
+  return out;
+}
+
+/**
+ * 캘린더: 왼쪽에 작은 달력, 오른쪽에 고른 날의 메모와 다가오는 일정.
+ * 달력은 "어느 날에 무엇이 있나"만 점으로 보여주고, 내용은 오른쪽 목록에서 읽는다 (큰 칸에 제목을 잘라 넣지 않는다).
+ */
 export function CalendarView({ list, now }: { list: Note[]; now: number }) {
   const calMonth = useApp((s) => s.calMonth);
   const calDay = useApp((s) => s.calDay);
@@ -143,7 +158,9 @@ export function CalendarView({ list, now }: { list: Note[]; now: number }) {
     setCal({ month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` });
   };
   const goToday = () => setCal({ month: today.slice(0, 7), day: today });
-  const dayNotes = calDay ? (byDay.get(calDay) ?? []) : [];
+  const selected = calDay ?? today;
+  const dayNotes = byDay.get(selected) ?? [];
+  const upcoming = calBasis === 'date' ? upcomingGroups(byDay, today, selected) : [];
   const undated = calBasis === 'date' ? list.filter((n) => !noteDay(n, 'date')).length : 0;
 
   // 방향키로 날짜 이동 (키보드만으로 조작)
@@ -151,8 +168,7 @@ export function CalendarView({ list, now }: { list: Note[]; now: number }) {
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
     if (!step) return;
     e.preventDefault();
-    const base = calDay ?? today;
-    const [by, bm, bd] = base.split('-').map(Number) as [number, number, number];
+    const [by, bm, bd] = selected.split('-').map(Number) as [number, number, number];
     const next = dayKey(new Date(by, bm - 1, bd + step));
     setCal({ month: next.slice(0, 7), day: next });
     requestAnimationFrame(() => gridRef.current?.querySelector<HTMLButtonElement>(`[data-day="${next}"]`)?.focus());
@@ -160,12 +176,42 @@ export function CalendarView({ list, now }: { list: Note[]; now: number }) {
 
   return (
     <div className="calendar">
-      <div className="cal-head">
-        <div className="cal-nav">
-          <button type="button" className="icon-round" aria-label={ko.cal.prev} onClick={() => move(-1)}>‹</button>
+      <div className="cal-side">
+        <div className="cal-head">
           <h2 className="cal-title">{ko.time.month(y, m)}</h2>
-          <button type="button" className="icon-round" aria-label={ko.cal.next} onClick={() => move(1)}>›</button>
-          <button type="button" className="btn btn-sm" onClick={goToday}>{ko.cal.today}</button>
+          <div className="cal-nav">
+            <button type="button" className="icon-round" aria-label={ko.cal.prev} onClick={() => move(-1)}>‹</button>
+            <button type="button" className="btn btn-sm" onClick={goToday}>{ko.cal.today}</button>
+            <button type="button" className="icon-round" aria-label={ko.cal.next} onClick={() => move(1)}>›</button>
+          </div>
+        </div>
+        <div className="cal-grid" ref={gridRef} onKeyDown={onGridKey}>
+          {ko.time.weekdays.map((w, i) => (
+            <div key={w} className={`cal-wd${i === 0 ? ' sun' : ''}`} aria-hidden="true">{w}</div>
+          ))}
+          {days.map((d) => {
+            const count = byDay.get(d)?.length ?? 0;
+            const inMonth = d.slice(0, 7) === calMonth;
+            return (
+              <button
+                key={d}
+                type="button"
+                data-day={d}
+                className={`cal-cell${inMonth ? '' : ' out'}${d === today ? ' today' : ''}`}
+                aria-pressed={d === selected}
+                aria-label={`${formatDay(d)}${count ? `, ${ko.main.count(count)}` : ''}`}
+                tabIndex={d === selected ? 0 : -1}
+                onClick={() => setCal({ day: d })}
+              >
+                <span className="cal-num">{Number(d.slice(8))}</span>
+                <span className="cal-dots" aria-hidden="true">
+                  {Array.from({ length: Math.min(3, count) }, (_, i) => (
+                    <i key={i} />
+                  ))}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="segment" role="group" aria-label={ko.cal.basis}>
           {(['date', 'created'] as const).map((b) => (
@@ -173,61 +219,34 @@ export function CalendarView({ list, now }: { list: Note[]; now: number }) {
           ))}
         </div>
       </div>
-      <div className="cal-grid" role="grid" aria-label={ko.time.month(y, m)} ref={gridRef} onKeyDown={onGridKey}>
-        {ko.time.weekdays.map((w, i) => (
-          <div key={w} className={`cal-wd${i === 0 ? ' sun' : ''}`} role="columnheader">{w}</div>
-        ))}
-        {days.map((d) => {
-          const items = byDay.get(d) ?? [];
-          const inMonth = d.slice(0, 7) === calMonth;
-          const label = `${formatDay(d)}${items.length ? `, ${ko.main.count(items.length)}` : ''}`;
-          return (
-            <button
-              key={d}
-              type="button"
-              role="gridcell"
-              data-day={d}
-              className={`cal-cell${inMonth ? '' : ' out'}${d === today ? ' today' : ''}`}
-              aria-selected={d === calDay}
-              aria-label={label}
-              tabIndex={d === (calDay ?? today) ? 0 : -1}
-              onClick={() => setCal({ day: d })}
-            >
-              <span className="cal-num">{Number(d.slice(8))}</span>
-              <span className="cal-items">
-                {items.slice(0, 3).map((n) => (
-                  <span key={n.id} className="cal-item">{displayTitle(n)}</span>
-                ))}
-                {items.length > 3 && <span className="cal-more">+{items.length - 3}</span>}
-              </span>
-              {items.length > 0 && <span className="cal-dot" aria-hidden="true" />}
-            </button>
-          );
-        })}
-      </div>
-      <div className="cal-day">
-        {calDay ? (
-          <>
-            <div className="cal-day-head">
-              <strong>{formatDay(calDay)}</strong>
-              <span className="muted small">{ko.main.count(dayNotes.length)}</span>
-            </div>
-            {dayNotes.length === 0 ? (
-              <p className="small muted">{ko.cal.emptyDay}</p>
-            ) : (
-              dayNotes.map((n) => <NoteRow key={n.id} n={n} now={now} />)
-            )}
-          </>
-        ) : (
-          <p className="small muted">
-            {ko.cal.pickDay}
-            {undated > 0 && (
-              <>
-                {' '}
-                <button type="button" className="btn-link" onClick={() => setPref('view', 'list')}>{ko.cal.undated(undated)}</button>
-              </>
-            )}
-          </p>
+      <div className="cal-agenda">
+        <section className="agenda-day" aria-label={formatDay(selected)}>
+          <h3 className="agenda-head">
+            {selected === today && <span className="date-chip today">{ko.cal.today}</span>}
+            {formatDay(selected)}
+            <span className="agenda-count">{dayNotes.length > 0 && ko.main.count(dayNotes.length)}</span>
+          </h3>
+          {dayNotes.length === 0 ? <p className="agenda-empty">{ko.cal.emptyDay}</p> : dayNotes.map((n) => <NoteRow key={n.id} n={n} now={now} hideDate />)}
+        </section>
+        {upcoming.length > 0 && (
+          <section aria-label={ko.cal.upcoming}>
+            <div className="label agenda-label">{ko.cal.upcoming}</div>
+            {upcoming.map(([k, items]) => (
+              <div key={k} className="agenda-group">
+                <button type="button" className="agenda-date" onClick={() => setCal({ day: k })}>
+                  {k === today ? ko.cal.today : formatDay(k)}
+                </button>
+                <div className="agenda-items">
+                  {items.map((n) => (
+                    <NoteRow key={n.id} n={n} now={now} hideDate />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+        {undated > 0 && (
+          <button type="button" className="btn-link muted agenda-undated" onClick={() => setPref('view', 'list')}>{ko.cal.undated(undated)}</button>
         )}
       </div>
     </div>

@@ -133,15 +133,24 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .search-btn:hover { background: var(--line); }
 .search-btn kbd { background: var(--surface); border-color: transparent; }
 .columns { flex: 1; display: flex; min-height: 0; }
-.sidebar { width: 220px; flex: none; border-right: 1px solid var(--line); padding: 16px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; overflow-y: auto; background: var(--surface-2); }
-.sidebar .label { padding: 4px 10px; }
-.sidebar .label + .nav-item { margin-top: 2px; }
-.nav-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--radius-s); border: 0; background: none; text-align: left; width: 100%; min-height: 36px; color: var(--ink-2); transition: background var(--motion); }
+.sidebar { width: 244px; flex: none; border-right: 1px solid var(--line); padding: 14px 10px 10px; display: flex; flex-direction: column; gap: 1px; font-size: 14px; overflow-y: auto; background: var(--surface-2); }
+.side-head { padding: 6px 10px 12px; }
+.side-search { display: flex; align-items: center; gap: 8px; height: 36px; margin-bottom: 10px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--muted); font-size: 13px; text-align: left; transition: border-color var(--motion); }
+.side-search:hover { border-color: var(--line-strong); }
+.side-search span { flex: 1; }
+.side-foot { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.side-foot .badge { padding: 0 10px; }
+.side-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.sidebar .label { padding: 16px 10px 4px; }
+
+.nav-item { display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: var(--radius-s); border: 0; background: none; text-align: left; width: 100%; min-height: 34px; color: var(--ink-2); transition: background var(--motion); }
+.nav-item .icon { font-size: 16px; color: var(--muted); }
+.nav-item[aria-current="true"] .icon { color: var(--ink); }
 .nav-item > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-item:hover { background: var(--fill); }
 .nav-item[aria-current="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(21, 23, 28, .08); }
 /* 현재 위치는 채움으로만. 붉은 막대는 쓰지 않는다 */
-.nav-item .count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.nav-item .count { color: var(--muted); font-weight: 400; font-size: 12px; font-variant-numeric: tabular-nums; }
 .sidebar .spacer { flex: 1; }
 .list { width: 340px; flex: none; border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
 .list-head { padding: 4px 12px 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
@@ -159,11 +168,15 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .conflict-flag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--danger); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; }
 .pin { color: var(--muted); margin-right: 4px; font-size: 13px; }
 
-.editor { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 28px 56px 16px; background: var(--surface); overflow: hidden; }
+.editor { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 36px 56px 16px; background: var(--surface); overflow: hidden; }
 /* 한 줄이 너무 길면 읽기 어렵다. 폭은 설정 > 모양 > 편집기 폭 (--editor-width) */
 .editor-inner { flex: 1; min-height: 0; width: 100%; max-width: var(--editor-width, 760px); margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .editor-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); gap: 12px; min-width: 0; }
 .editor-meta .crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.editor-empty { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 18px; color: var(--muted); font-size: 14px; }
+.hint-list { display: flex; flex-direction: column; gap: 2px; width: 248px; }
+.hint-list button { display: flex; justify-content: space-between; align-items: center; min-height: 38px; padding: 0 12px; border: 0; background: none; border-radius: var(--radius-s); font-size: 13px; color: var(--ink-2); transition: background var(--motion); }
+.hint-list button:hover { background: var(--fill); }
 .editor-title { font-family: var(--font-sans); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; border: 0; padding: 0; outline: none; background: transparent; width: 100%; }
 .editor-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; }
 .editor-body { flex: 1; min-height: 0; overflow: auto; }
@@ -209,10 +222,10 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .cm-md-mark { color: var(--muted); }
 
 /* ---- 목록 머리 · 빠른 메모 ---- */
-.list-top { display: flex; flex-direction: column; gap: 10px; padding: 16px 16px 0; }
+.list-top { display: flex; flex-direction: column; gap: 10px; padding: 20px 16px 0; }
 .list-title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.list-title { font-size: 20px; }
-.quick-add { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px 0 12px; border-radius: var(--radius-m); background: var(--fill); transition: background var(--motion), box-shadow var(--motion); }
+.list-title { font-size: 22px; }
+.quick-add { display: flex; align-items: center; gap: 8px; min-height: 42px; max-width: 640px; padding: 0 6px 0 12px; border-radius: var(--radius-m); background: var(--fill); transition: background var(--motion), box-shadow var(--motion); }
 .quick-add:focus-within { background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong), 0 0 0 4px var(--fill); }
 .quick-add input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 14px; }
 .quick-add .quick-plus { color: var(--muted); font-size: 18px; line-height: 1; width: 16px; text-align: center; }
@@ -237,29 +250,40 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .note-card-body { flex: 1; font-size: 13px; color: var(--muted); line-height: 1.6; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .note-card-foot { margin-top: auto; display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
 
-/* ---- 캘린더 ---- */
-.calendar { display: flex; flex-direction: column; gap: 10px; padding: 4px; }
-.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.cal-nav { display: flex; align-items: center; gap: 4px; }
-.cal-title { font-size: 17px; min-width: 7.5em; text-align: center; font-variant-numeric: tabular-nums; }
-.icon-round { width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; font-size: 20px; line-height: 1; color: var(--ink-2); }
+/* ---- 캘린더: 작은 달력 + 일정 목록 ---- */
+.list-scroll { container-type: inline-size; }
+.calendar { display: grid; grid-template-columns: 308px minmax(0, 1fr); gap: 36px; padding: 12px 8px; align-items: start; }
+.cal-side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }
+.cal-side .segment { align-self: flex-start; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-left: 8px; }
+.cal-nav { display: flex; align-items: center; gap: 2px; }
+.cal-title { font-size: 17px; font-variant-numeric: tabular-nums; }
+.icon-round { width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; font-size: 20px; line-height: 1; color: var(--ink-2); }
 .icon-round:hover { background: var(--fill); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.cal-wd { font-size: 11px; color: var(--muted); text-align: center; padding: 4px 0; font-weight: 500; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-wd { font-size: 11px; color: var(--muted); text-align: center; padding: 4px 0 6px; font-weight: 500; }
 .cal-wd.sun { color: var(--accent); }
-.cal-cell { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-height: 92px; padding: 6px; border: 0; border-radius: var(--radius-m); background: var(--surface-2); text-align: left; overflow: hidden; transition: background var(--motion), box-shadow var(--motion); }
+.cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; border-radius: var(--radius-m); background: transparent; transition: background var(--motion); }
 .cal-cell:hover { background: var(--fill); }
-.cal-cell.out { background: transparent; color: var(--muted); }
-.cal-cell[aria-selected="true"] { background: var(--surface); box-shadow: 0 0 0 1.5px var(--ink); }
-.cal-num { font-size: 12px; font-weight: 600; width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 50%; font-variant-numeric: tabular-nums; }
-.cal-cell.today .cal-num { background: var(--accent); color: #fff; }
-.cal-items { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cal-item { font-size: 11px; line-height: 1.4; padding: 1px 6px; border-radius: 5px; background: var(--surface); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: inset 2px 0 0 var(--ink-2); }
-.cal-more { font-size: 11px; color: var(--muted); padding-left: 6px; }
-.cal-dot { display: none; }
-.cal-day { display: flex; flex-direction: column; gap: 4px; padding: 10px 4px 0; border-top: 1px solid var(--line); margin-top: 4px; }
-.cal-day-head { display: flex; align-items: baseline; gap: 8px; padding: 0 8px 4px; }
-.cal-day > p { padding: 0 8px; }
+.cal-cell.out { color: var(--muted); opacity: .5; }
+.cal-cell[aria-pressed="true"] { background: var(--fill); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.cal-num { font-size: 13px; font-weight: 500; width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 50%; font-variant-numeric: tabular-nums; }
+.cal-cell.today .cal-num { background: var(--accent); color: #fff; font-weight: 700; }
+.cal-dots { display: flex; gap: 3px; height: 4px; }
+.cal-dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-2); }
+.cal-agenda { display: flex; flex-direction: column; gap: 22px; min-width: 0; max-width: 620px; }
+.agenda-head { display: flex; align-items: center; gap: 8px; font-size: 20px; padding: 2px 12px 8px; }
+.agenda-count { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.agenda-empty { padding: 2px 12px; font-size: 13px; color: var(--muted); }
+.agenda-label { padding: 0 12px 6px; }
+.agenda-group { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); border-top: 1px solid var(--line-2); padding: 4px 0; }
+.agenda-date { align-self: start; text-align: left; border: 0; background: none; padding: 13px 12px; font-size: 12px; color: var(--muted); white-space: nowrap; border-radius: var(--radius-s); }
+.agenda-date:hover { color: var(--ink); }
+.agenda-undated { align-self: flex-start; margin-left: 12px; }
+@container (max-width: 720px) {
+  .calendar { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .cal-side { position: static; max-width: 420px; }
+}
 /* 캘린더·카드는 가운데 열을 넓게, 편집기는 고른 메모가 있을 때만 오른쪽에 */
 .columns[data-mode="calendar"] .list, .columns[data-mode="cards"] .list { width: auto; flex: 1 1 0; min-width: 0; }
 .columns[data-mode="calendar"] .editor, .columns[data-mode="cards"] .editor { flex: 0 0 min(42%, 600px); border-left: 0; padding: 24px 32px 16px; }
@@ -328,7 +352,7 @@ button.chip:hover { background: var(--line); color: var(--ink); }
   .seal-hero { width: 38px; padding: 7px 0 6px; font-size: 16px; }
   .unlock-right { padding: 24px 16px; align-items: flex-start; }
   .unlock-card { padding: 12px 4px; }
-  .search-btn { width: auto; }
+  .search-btn { width: auto; gap: 8px; }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex; }
   .topbar { padding: 0 16px; }
@@ -362,13 +386,14 @@ button.chip:hover { background: var(--line); color: var(--ink); }
   .overlay.center .dialog .actions .btn { flex: 1; min-height: 48px; }
   .palette { max-height: 80vh; }
   .list-top { padding: 12px 16px 0; }
+  .cal-cell { aspect-ratio: auto; height: 46px; }
+  .calendar { padding: 4px 0; }
+  .agenda-group { grid-template-columns: 6.5em minmax(0, 1fr); }
   .list-title { font-size: 24px; }
   .columns[data-mode] .list { width: 100%; flex: 1; }
   .columns[data-mode] .editor { flex: 1; padding: 12px 16px; }
   .columns[data-mode][data-view="list"] .editor { display: none; }
-  .cal-cell { min-height: 48px; padding: 4px; align-items: center; }
-  .cal-items { display: none; }
-  .cal-dot { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-2); }
+
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .note-card { min-height: 88px; padding: 12px; }
   .list-scroll { padding-bottom: 96px; }

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Note } from '@vault/core';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
-import { BackIcon } from '../components/Icons';
+import { BackIcon, CalendarIcon, FolderIcon, GearIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
 import { CalendarView, CardGrid, NoteRow, QuickAdd } from './NoteViews';
 import { Logo } from '../components/Seal';
 import { Editor } from './Editor';
@@ -137,34 +137,32 @@ export function MainScreen() {
 
   // 모바일 편집 화면의 상단 바: 뒤로 + 상태 + 완료만 (DESIGN.md 모바일 상단 바)
   const mobileEditing = mobileView === 'editor' && !!selectedId;
-  const hideWhileEditing = mobileEditing ? ' desktop-only' : '';
 
   return (
     <div className="main">
-      <header className="topbar">
+      {/* 모바일 전용 상단 바. PC에는 가로 바가 없다: 내비게이션이 내용보다 튀지 않게 사이드바로 모았다. */}
+      <header className="topbar mobile-only">
         <div className="left">
           {mobileEditing && (
-            <button type="button" className="back-btn mobile-only" aria-label={ko.main.backToList} onClick={() => useApp.getState().setMobileView('list')}>
+            <button type="button" className="back-btn" aria-label={ko.main.backToList} onClick={() => useApp.getState().setMobileView('list')}>
               <BackIcon />
               {ko.main.backToListShort}
             </button>
           )}
-          <Logo className="desktop-only" />
           <StatusBadge status={status} local={app.backendKind === 'memory'} />
         </div>
         <div className="right">
-          <button type="button" className={`search-btn${hideWhileEditing}`} onClick={() => setPalette(true)} aria-label={ko.main.search}>
-            <span>{ko.main.search}</span>
-            <kbd className="desktop-only">Ctrl K</kbd>
-          </button>
-          <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newNote()} title="Alt+N">
-            {ko.main.newNote}
-          </button>
+          {!mobileEditing && (
+            <button type="button" className="search-btn" onClick={() => setPalette(true)} aria-label={ko.main.search}>
+              <SearchIcon />
+              <span>{ko.main.search}</span>
+            </button>
+          )}
           {/* 왼쪽 `목록`은 이동, 오른쪽 `완료`는 이 화면의 작업(키보드 내리고 저장). 같은 곳으로 가는 버튼을 두 개 두지 않는다. */}
           {mobileEditing && editing && (
             <button
               type="button"
-              className="btn btn-primary btn-sm mobile-only"
+              className="btn btn-primary btn-sm"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 (document.activeElement as HTMLElement | null)?.blur();
@@ -174,9 +172,11 @@ export function MainScreen() {
               {ko.common.done}
             </button>
           )}
-          <button type="button" className={`btn btn-sm${hideWhileEditing}`} onClick={() => actions.lock()} aria-label={ko.main.lock} title="Ctrl+L">
-            {ko.main.lock}
-          </button>
+          {!mobileEditing && (
+            <button type="button" className="btn btn-sm" onClick={() => actions.lock()}>
+              {ko.main.lock}
+            </button>
+          )}
         </div>
       </header>
       <div className="columns" data-view={mobileView} data-mode={view} data-selected={selectedId ? 'true' : 'false'}>
@@ -190,11 +190,14 @@ export function MainScreen() {
 }
 
 function Sidebar() {
+  const app = useApp((s) => s.app);
+  const status = useApp((s) => s.status);
   const notes = useApp((s) => s.notes);
   const trash = useApp((s) => s.trash);
   const filter = useApp((s) => s.filter);
   const setFilter = useApp((s) => s.setFilter);
   const setScreen = useApp((s) => s.setScreen);
+  const setPalette = useApp((s) => s.setPalette);
   const actions = useNoteActions();
   const folders = useMemo(() => {
     const m = new Map<string | null, number>();
@@ -208,33 +211,55 @@ function Sidebar() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
   }, [notes]);
   const is = (f: Filter) => JSON.stringify(f) === JSON.stringify(filter);
-  const Item = ({ f, label, count, muted }: { f: Filter; label: string; count?: number | undefined; muted?: boolean }) => (
-    <button type="button" className="nav-item" aria-current={is(f) ? 'true' : undefined} onClick={() => setFilter(f)} style={muted ? { color: 'var(--muted)' } : undefined}>
+  const Item = ({ f, label, count, icon }: { f: Filter; label: string; count?: number | undefined; icon: ReactNode }) => (
+    <button type="button" className="nav-item" aria-current={is(f) ? 'true' : undefined} onClick={() => setFilter(f)}>
+      {icon}
       <span>{label}</span>
       {count !== undefined && <span className="count">{count}</span>}
     </button>
   );
+  const now = new Date();
   return (
     <nav className="sidebar" aria-label={ko.main.folders}>
-      <div className="label">{ko.main.folders}</div>
-      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.length} />
-      <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} />
-      {folders.named.map(([f, c]) => (
-        <Item key={f} f={{ kind: 'folder', folder: f }} label={f} count={c} />
-      ))}
-      {folders.none > 0 && folders.named.length > 0 && <Item f={{ kind: 'folder', folder: null }} label={ko.main.noFolder} count={folders.none} />}
-      <button type="button" className="nav-item" onClick={() => void actions.today()}>
-        <span>{ko.main.today}</span>
+      <div className="side-head">
+        <Logo />
+      </div>
+      <button type="button" className="side-search" onClick={() => setPalette(true)}>
+        <SearchIcon />
+        <span>{ko.main.search}</span>
+        <kbd>Ctrl K</kbd>
       </button>
-      <Item f={{ kind: 'trash' }} label={ko.main.trash} count={trash.length || undefined} muted />
-      {tags.length > 0 && <div className="label" style={{ paddingTop: 14 }}>{ko.main.tags}</div>}
+      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.length} icon={<NotesIcon />} />
+      <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} icon={<CalendarIcon />} />
+      <button type="button" className="nav-item" onClick={() => void actions.today()} title="Ctrl+D">
+        <TodayIcon />
+        <span>{ko.main.today}</span>
+        <span className="count">{ko.time.date(now.getMonth() + 1, now.getDate())}</span>
+      </button>
+      {folders.named.length > 0 && <div className="label">{ko.main.folders}</div>}
+      {folders.named.map(([f, c]) => (
+        <Item key={f} f={{ kind: 'folder', folder: f }} label={f} count={c} icon={<FolderIcon />} />
+      ))}
+      {folders.none > 0 && folders.named.length > 0 && <Item f={{ kind: 'folder', folder: null }} label={ko.main.noFolder} count={folders.none} icon={<FolderIcon />} />}
+      {tags.length > 0 && <div className="label">{ko.main.tags}</div>}
       {tags.map(([t, c]) => (
-        <Item key={t} f={{ kind: 'tag', tag: t }} label={`#${t}`} count={c} />
+        <Item key={t} f={{ kind: 'tag', tag: t }} label={t} count={c} icon={<TagIcon />} />
       ))}
       <div className="spacer" />
-      <button type="button" className="btn btn-sm" onClick={() => setScreen('settings')}>
-        {ko.main.settings}
-      </button>
+      <Item f={{ kind: 'trash' }} label={ko.main.trash} count={trash.length || undefined} icon={<TrashIcon />} />
+      <div className="side-foot">
+        <StatusBadge status={status} local={app.backendKind === 'memory'} />
+        <div className="side-actions">
+          <button type="button" className="nav-item" onClick={() => setScreen('settings')}>
+            <GearIcon />
+            <span>{ko.main.settings}</span>
+          </button>
+          <button type="button" className="nav-item" onClick={() => actions.lock()} title="Ctrl+L">
+            <LockIcon />
+            <span>{ko.main.lock}</span>
+          </button>
+        </div>
+      </div>
     </nav>
   );
 }
@@ -273,10 +298,10 @@ function NoteList() {
         <div className="list-title-row">
           <h1 className="list-title">{title}</h1>
           <button type="button" className="btn btn-sm mobile-only" onClick={() => setScreen('settings')}>{ko.main.settings}</button>
-        </div>
-        <div className="input-wrap sm mobile-only">
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={ko.main.searchNotes} aria-label={ko.main.searchNotes} />
-          {query && <button type="button" className="clear" aria-label={ko.common.clear} onClick={() => setQuery('')}>×</button>}
+          <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newNote()} title="Alt+N">
+            <PlusIcon />
+            {ko.main.newNote}
+          </button>
         </div>
         {!inTrash && <QuickAdd />}
         <div className="folder-chips">

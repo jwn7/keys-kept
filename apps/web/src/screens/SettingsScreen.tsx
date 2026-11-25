@@ -464,6 +464,7 @@ function DataSection() {
     const ok = await ui.confirm({ title: S.data.deleteTitle, body: S.data.deleteConfirm, requireWord: S.data.deleteWord, confirmLabel: S.data.deleteWord, danger: true });
     if (!ok) return;
     await app.session.purgeEverything();
+    await disableAutoBackup(); // 이 기기에 남긴 폴더 권한과 잠근 백업 비밀번호도 지운다
     app.driveAuth?.disconnect();
     try {
       localStorage.clear();

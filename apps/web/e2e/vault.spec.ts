@@ -22,7 +22,7 @@ async function unlock(page: Page, password = PASSWORD) {
 
 test('처음 설정 → 복구 키 12단어 → 메인', async ({ page }) => {
   await setup(page);
-  await expect(page.locator('.badge')).toHaveText('로컬 전용');
+  await expect(page.locator('.sidebar .badge')).toHaveText('로컬 전용');
 });
 
 test('약한 비밀번호로는 열쇠를 만들 수 없다', async ({ page }) => {
@@ -35,7 +35,7 @@ test('약한 비밀번호로는 열쇠를 만들 수 없다', async ({ page }) =
 
 test('쓰자마자 잠가도 내용이 남는다 (잠그기 전 저장)', async ({ page }) => {
   await setup(page);
-  await page.locator('.topbar').getByRole('button', { name: '새 메모' }).click();
+  await page.locator('.list-title-row').getByRole('button', { name: '새 메모' }).click();
   await page.getByLabel('메모 제목').fill('잠금 테스트');
   await page.locator('.cm-content').click();
   await page.keyboard.type('디바운스를 기다리지 않고 저장돼야 한다');
@@ -64,7 +64,7 @@ test('빠른 메모 → 목록, 여러 단어 검색', async ({ page }) => {
   }
   await expect(page.locator('.note-row')).toHaveCount(3);
 
-  await page.getByRole('button', { name: '검색과 명령' }).click();
+  await page.locator('.sidebar').getByRole('button', { name: '검색과 명령' }).click();
   await page.getByPlaceholder('메모 검색 또는 명령…').fill('회의 배포');
   const items = page.locator('.palette-item', { hasText: '회의' });
   await expect(items).toHaveCount(1);
@@ -78,11 +78,13 @@ test('캘린더에서 날을 고르고 빠른 메모를 넣으면 그 날짜에 
   await cell.click();
   await page.getByLabel('빠른 메모').fill('치과 예약');
   await page.getByLabel('빠른 메모').press('Enter');
-  await expect(cell.locator('.cal-item')).toHaveText('치과 예약');
+  await expect(cell.locator('.cal-dots i')).toHaveCount(1);
+  await expect(page.locator('.agenda-day .note-row')).toHaveText('치과 예약');
   // 다시 잠갔다 열어도 날짜가 남는다 (암호문 안에 저장)
   await page.getByRole('button', { name: '잠금', exact: true }).click();
   await unlock(page);
-  await expect(page.locator('.cal-cell:not(.out)').nth(14).locator('.cal-item')).toHaveText('치과 예약');
+  await page.locator('.cal-cell:not(.out)').nth(14).click();
+  await expect(page.locator('.agenda-day .note-row')).toHaveText('치과 예약');
 });
 
 test('휴지통으로 보낸 뒤 되돌리기', async ({ page }) => {
