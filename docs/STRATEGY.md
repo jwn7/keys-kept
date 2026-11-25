@@ -15,7 +15,42 @@
 | 크롬 내장 AI(Gemini Nano)는 영어·스페인어·일본어·독일어·프랑스어만 지원 | 브라우저 내장 모델에 기댈 수 없다. 모델을 직접 싣거나 받아야 한다 |
 | 암호화된 실시간 공동편집(Keyhive 등)은 아직 연구 단계 | 여기에 뛰어들면 안 된다 |
 
-찾지 못한 것: 메모 앱별 사용자 수·매출, 나라별 점유율. 시장 크기에 대한 수치 근거는 이 문서에 없다.
+## 시장 신호 (스토어·깃허브·최근 이슈)
+
+### 지금 가장 큰 사건: 노션 AI 대화 유출 (2026-10~11)
+노션의 AI 인프라 업체(Fireworks AI)가 뚫려 노션 사용자의 AI 대화 기록이 노출됐다. 노션은 영향이 1% 미만이라고 밝혔고, 대화에 붙여 넣은 API 키를 폐기했다. "계약에는 보관하지 않는다고 돼 있었는데 왜 남아 있었나"가 논점이 됐다.
+뜻: **AI에 평문을 보내는 구조의 위험이 가정이 아니라 실제 사고가 됐다.** "우리 AI는 기기 밖으로 아무것도 안 보낸다"를 지금 말할 수 있으면 설명이 필요 없다.
+
+### 깃허브 (2026-11-25, 공개 API로 조회)
+| 저장소 | 별 | 성격 |
+|---|---|---|
+| AppFlowy / AFFiNE | 79.5k / 78.1k | 노션 대안, 오픈소스, AI 협업 |
+| memos | 64.7k | 셀프호스팅 짧은 메모 |
+| Joplin / SiYuan / Logseq / Trilium | 57.3k / 47.4k / 45.7k / 39.1k | 로컬·셀프호스팅 지식 관리 |
+| khoj | 38.2k | 셀프호스팅 "AI 두 번째 뇌" |
+| Notesnook / Anytype(데스크톱) / Standard Notes | 15.0k / 9.1k / 6.7k | **종단간 암호화** 메모 |
+| obsidian-copilot / smart-connections | 8.0k / 5.6k | 옵시디언 AI 플러그인(에이전트, 뜻으로 관련 메모 찾기) |
+
+2026년에 새로 생겨 빠르게 큰 것: 옵시디언 + AI 에이전트로 메모를 스스로 정리하는 도구(claude-obsidian 16.7k, obsidian-second-brain 5.5k), **내 컴퓨터에만 남는 AI 회의록**(yogurt, 2주 만에 3.4k), AI 회의 비서류.
+
+읽히는 것:
+- 프라이버시 수요는 크지만 사람들이 고르는 말은 "암호화"보다 **"내 컴퓨터에 있다 / 내가 호스팅한다 / 열려 있다"**다. 암호화 앱의 별은 로컬·셀프호스팅 앱의 1/4~1/10이다. "제로-널리지"를 앞세우기보다 "내 기기 밖으로 안 나간다"로 말해야 한다.
+- 올해의 성장은 전부 **AI + 내 메모**에서 나왔다. 뜻으로 관련 메모를 찾는 플러그인이 5천 별을 넘겼다는 것은 그 기능에 수요가 있다는 직접 증거다.
+- 그런데 그 AI 도구들은 메모가 평문 파일이거나 외부 모델에 보낸다. 암호화 + 기기 안 AI를 같이 하는 큰 프로젝트는 아직 없다(작은 신생 프로젝트는 여럿 나오고 있다: 기기 안 임베딩 검색을 내세운 Tentacle, Sugilite 등).
+- 회의록은 올해 가장 뜨거운 메모 영역이다. 우리는 이미 `@이름` 할 일 모음이 있어서, 기기 안 음성 받아쓰기를 붙이면 이어진다(후보, 아래 순서 6).
+
+### 사업 규모 참고
+- 옵시디언: 외부 투자 없이 소수 인원으로 운영, 사용자 약 100만~150만(추정), 연 매출 추정은 200만~2,500만 달러로 편차가 크다. 수익원은 **유료 동기화**. 작은 팀이 이 시장에서 버틸 수 있다는 예이고, 우리 Pro(동기화)와 같은 모델이다.
+- Anytype: 시드 1,340만 달러, 사용자 약 10만(비공식).
+- 노션은 2024년에 암호화 워크스페이스 Skiff를 인수한 뒤 서비스를 닫았다. 큰 회사가 암호화 제품을 사서 없앤 사례라, 공개 소스와 표준 포맷 백업(떠날 자유)이 신뢰의 근거가 된다.
+
+### 사용자 불만 (리뷰)
+- Notesnook: 검색이 여러 낱말의 교집합을 못 찾는다, 다크 모드에서 선택한 메모가 안 보인다, 옮겨 올 때 태그가 깨진다.
+- Standard Notes: 비밀번호를 잃으면 계정을 지우라는 안내, 결제 불만 등 신뢰 문제.
+- 우리는 교집합 검색, 복구 키 12단어, 표준 백업이 이미 있다. 가져오기(다른 앱에서 옮겨 오기)는 마크다운 폴더만 되므로 Notesnook·Standard Notes·Evernote 내보내기 파일 가져오기를 추가할 가치가 있다.
+
+### 찾지 못한 것
+앱스토어·플레이스토어의 메모 앱 다운로드 순위와 성장률(Sensor Tower 같은 유료 자료가 필요), 나라별 점유율, 암호화 메모 앱의 실제 사용자 수. 이 부분의 수치 근거는 이 문서에 없다. 스토어 쪽에서 확인된 것은 편집자 추천 목록에서 AI 회의록 앱(Granola)이 상위로 올라왔다는 정도다.
 
 ## 노션·슬랙과 싸우지 않는다
 노션과 슬랙은 **팀이 같이 쓰는 도구**다. 검색, 권한, 관리자 감사, AI가 전부 서버가 내용을 읽는다는 전제 위에 있다. 그 전제를 버리면 그들의 제품이 성립하지 않으므로 **따라올 수 없는 방향**이 하나 있다: 한 사람의 생각을 담는, 서버가 못 읽는 층.
@@ -59,6 +94,9 @@
 3. 검색·관련 메모를 벡터로 교체(낱말 검색과 섞어 순위).
 4. 주제 흐름, 잊고 있던 메모.
 5. 작은 LLM(WebGPU)은 그 뒤. 요약·질문 답하기는 품질을 재 보고 결정.
+6. 후보: 기기 안 음성 받아쓰기로 회의록 만들기(할 일·담당자 뽑기와 연결), 다른 앱 내보내기 파일 가져오기.
+
+말하는 방식도 바꾼다: 첫 문장은 "제로-널리지"가 아니라 **"AI까지 전부 내 기기 안에서. 밖으로 나가는 것은 암호문뿐."**
 
 KPI(`docs/KPI.md`)에 더할 것: 검색해서 원하는 메모를 연 비율, 관련 메모를 눌러 본 비율.
 
@@ -71,3 +109,8 @@ KPI(`docs/KPI.md`)에 더할 것: 검색해서 원하는 메모를 연 비율, �
 - 임베딩에서 원문 복원: https://ar5iv.labs.arxiv.org/html/2310.06816 , https://arxiv.org/html/2502.11308v2
 - 크롬 내장 AI 지원 언어: https://developer.chrome.com/docs/ai/prompt-api , https://developer.chrome.com/docs/ai/get-started
 - 암호화 협업 연구 상태: https://www.inkandswitch.com/project/keyhive/ , https://automerge.org/blog/2026-july/
+- 노션 AI 대화 유출: https://www.bleepingcomputer.com/news/security/notion-says-fireworks-breach-exposed-customer-ai-chat-transcripts/ , https://www.scworld.com/brief/notion-discloses-data-exposure-following-security-breach-at-ai-vendor
+- 옵시디언·Anytype 규모: https://www.operatorbook.dev/stories/obsidian-revenue-estimates-2m-to-25m , https://blog.anytype.io/anytype-raises-13-4million-usd-funding/
+- 리뷰: https://itsfoss.com/news/standard-notes-to-notesnook/ , https://ca.trustpilot.com/review/standardnotes.com
+- 기기 안 임베딩 검색을 내세운 신생 앱: https://hnshowcase.com/post/47155400/tentacle-local-first-note-taking-app-that-organizes-itself
+- 깃허브 수치: 각 저장소의 공개 API(`api.github.com/repos/<owner>/<repo>`)
