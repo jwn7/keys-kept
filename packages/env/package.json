@@ -6,11 +6,14 @@
   "description": "암호화된 .env.age를 풀어 실행하는 프로그램의 환경변수로만 넣는다. 평문 .env를 디스크에 두지 않는다.",
   "exports": {
     ".": "./src/index.mjs",
-    "./load": "./src/load.mjs"
+    "./load": "./src/load.mjs",
+    "./flow": "./src/flow.mjs"
   },
   "bin": {
     "vault-run": "./bin/vault-run.mjs",
-    "vault-mcp": "./bin/vault-mcp.mjs"
+    "vault-mcp": "./bin/vault-mcp.mjs",
+    "vault-scan": "./bin/vault-scan.mjs",
+    "vault-check": "./bin/vault-check.mjs"
   },
   "scripts": {
     "test": "vitest run"

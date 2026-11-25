@@ -28,6 +28,8 @@ export { detectKey, isPublicEnvName, publicNameWarning } from './secrets/detect'
 export type { KeyDetection, KeyExposure, KeyMode } from './secrets/detect';
 export { parseEnv, formatEnv } from './secrets/envfile';
 export type { EnvEntry } from './secrets/envfile';
-export { isSecret, planEnvImport, envForProject, secretIssues, placesUsed, compromisedBy, maskValue } from './secrets/ledger';
-export type { SecretIssue } from './secrets/ledger';
+export { isSecret, planEnvImport, envForProject, envMatrix, secretIssues, placesUsed, compromisedBy, maskValue } from './secrets/ledger';
+export type { SecretIssue, EnvMatrix, MatrixCell } from './secrets/ledger';
+export { generateSecret } from './secrets/generate';
+export type { GenerateKind } from './secrets/generate';
 export { sealEnv, openEnv, envAgeFileName, EnvPassphraseError } from './secrets/envage';

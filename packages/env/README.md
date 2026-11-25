@@ -46,6 +46,27 @@ AI가 "이 키를 넣어 주세요"라고 할 때 채팅에 붙여 넣지 않게
 - 가리기는 값과 똑같은 글자열만 잡는다. 프로그램이 값을 잘라서 찍거나 다른 꼴(base64 등)로 바꿔 찍으면 못 잡는다.
 - 6자보다 짧은 값은 가리지 않는다(우연히 겹치는 글자가 많다).
 
+## 4. 깃 브랜치에 따라 환경 고르기
+프로젝트 폴더에 `.vault.json`을 두면 `vault-run`이 지금 브랜치에 맞는 파일을 고른다.
+```json
+{ "branches": { "main": "prod", "release/*": "prod", "*": "dev" } }
+```
+`main`에서는 `.env.prod.age`, 그 밖의 브랜치에서는 `.env.dev.age`를 쓴다. 맞는 파일이 없으면 `.env.age`. `--file`을 주면 그것이 우선한다.
+
+## 5. 실행 전에 빠진 변수 찾기
+```
+node packages/env/bin/vault-check.mjs            # .env.example 의 이름이 금고에 다 있는지
+```
+빠진 이름이 있으면 알리고 종료 코드 1로 끝난다.
+
+## 6. 커밋 전에 유출 막기
+```
+node packages/env/bin/vault-scan.mjs             # git에 올린 파일에 금고의 값이 들어 있는지
+node packages/env/bin/vault-scan.mjs src/a.ts    # 파일을 직접 줄 수도 있다
+```
+모양으로 추측하는 검사기와 달리 금고의 **실제 값**과 비교하므로, 어떤 서비스의 키든 잡는다. 값은 다시 찍지 않고 파일·줄·키 이름만 알린다. 8자 미만의 값은 보지 않는다.
+`.git/hooks/pre-commit`에서 부르면 커밋을 막는다(비밀번호는 `VAULT_ENV_PASSPHRASE`).
+
 ## age만으로 풀기
 이 패키지가 없어도 된다.
 ```

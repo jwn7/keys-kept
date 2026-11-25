@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { extractTags, envForProject, type Note } from '@vault/core';
-import { copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
+import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
@@ -125,6 +125,7 @@ export function MainScreen() {
   const editing = useApp((s) => s.editing);
   const view = useApp((s) => s.view);
   const isToday = useApp((s) => s.filter.kind === 'today' || s.filter.kind === 'incident');
+  const comparing = useApp((s) => s.compare && s.filter.kind === 'folder');
   const actions = useNoteActions();
 
   // 전역 단축키 (SPEC §2.3)
@@ -211,7 +212,7 @@ export function MainScreen() {
           )}
         </div>
       </header>
-      <div className="columns" data-view={mobileView} data-mode={isToday ? 'list' : view} data-selected={selectedId ? 'true' : 'false'}>
+      <div className="columns" data-view={mobileView} data-mode={comparing ? 'cards' : isToday ? 'list' : view} data-selected={selectedId ? 'true' : 'false'}>
         <Sidebar />
         <NoteList />
         <Editor />
@@ -349,7 +350,9 @@ function NoteList() {
   const setEnvImport = useApp((s) => s.setEnvImport);
   // 키를 넣는 화면: 오늘, 모든 키, 프로젝트
   const keyScreen = isToday || filter.kind === 'keys' || filter.kind === 'folder';
-  const noList = isToday || isIncident; // 목록 대신 자기 화면을 그리는 곳: 보기 방식·정렬을 숨긴다
+  const compare = useApp((s) => s.compare) && filter.kind === 'folder';
+  const setCompare = useApp((s) => s.setCompare);
+  const noList = isToday || isIncident || compare; // 목록 대신 자기 화면을 그리는 곳: 보기 방식·정렬을 숨긴다
   const project = filter.kind === 'folder' ? filter.folder : null;
   const envs = useMemo(() => (filter.kind === 'folder' ? envsOf(notes, project) : []), [notes, filter.kind, project]);
   const projectHasKeys = filter.kind === 'folder' && notes.some((n) => n.secret && n.folder === project);
@@ -401,6 +404,9 @@ function NoteList() {
                 ))}
               </div>
             )}
+            {envs.length > 0 && (
+              <button type="button" className="btn btn-sm" aria-pressed={compare} onClick={() => setCompare(!compare)}>{ko.keys.compare}</button>
+            )}
             <span className="env-bar-gap" />
             <button type="button" className="btn-link" onClick={() => setEnvImport({ text: '' })}>{ko.keys.importOpen}</button>
             {projectHasKeys && <button type="button" className="btn-link" onClick={() => void copyEnv()}>{ko.keys.exportCopy}</button>}
@@ -431,6 +437,8 @@ function NoteList() {
         {inTrash && list.length > 0 && <p className="small muted" style={{ padding: '10px 16px 0' }}>{ko.main.trashHint}</p>}
         {isIncident ? (
           <IncidentView />
+        ) : compare ? (
+          <CompareTable project={project} />
         ) : isToday && notes.length > 0 ? (
           <TodayView now={now} onDaily={() => void actions.today()} />
         ) : view === 'calendar' && !inTrash && !isToday ? (

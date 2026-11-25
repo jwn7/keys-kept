@@ -489,3 +489,23 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .incident-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; border: 0; background: none; text-align: left; padding: 8px 0; }
 .incident-row.done .key-name { text-decoration: line-through; color: var(--muted); }
 .incident-unknown { padding-top: 16px; }
+
+/* ---- 환경 비교표, 키 생성기 ---- */
+.secret-generate { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; margin-top: -8px; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.compare { padding: 0 12px 24px; }
+.compare-summary { margin: 4px 0 10px; font-size: 13px; color: var(--muted); }
+.compare-summary.warn { color: var(--accent); font-weight: 600; }
+.compare-scroll { overflow-x: auto; }
+.compare-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.compare-table th, .compare-table td { text-align: left; padding: 0 8px; height: 44px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.compare-table thead th { height: 34px; font-size: 12px; font-weight: 500; color: var(--muted); font-family: var(--font-mono); border-bottom-color: var(--line); }
+.compare-table thead th:first-child { font-family: var(--font-sans); }
+.compare-table tbody th { font-family: var(--font-mono); font-weight: 600; }
+.compare-cell { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; padding: 0; }
+.compare-open { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 6px 4px; border-radius: var(--radius-s); color: var(--ink-2); }
+.compare-open:hover, .compare-cell.missing:hover { background: var(--fill-hover); }
+.compare-cell.missing { padding: 6px 4px; border-radius: var(--radius-s); }
+
+/* 제목 줄: 단추가 여럿일 때 제목만 왼쪽, 단추들은 오른쪽에 모은다 */
+.list-title-row .list-title { margin-right: auto; }

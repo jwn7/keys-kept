@@ -107,3 +107,60 @@ describe('vault-mcp: AI에게 이름만 주고 값은 주지 않는다', () => {
     expect(r[3]!.result!.isError).toBe(true);
   }, 30_000);
 });
+
+// @ts-expect-error 순수 JS 모듈이라 타입 선언이 없다
+import { findLeaks, missingNames, pickEnvForBranch, resolveEnvFile } from '../src/flow.mjs';
+
+describe('개발 흐름 연결', () => {
+  it('브랜치 → 환경: 같은 이름이 먼저, 그다음 더 구체적인 무늬', () => {
+    const cfg = { branches: { main: 'prod', 'release/*': 'staging', '*': 'dev' } };
+    expect(pickEnvForBranch(cfg, 'main')).toBe('prod');
+    expect(pickEnvForBranch(cfg, 'release/1.2')).toBe('staging');
+    expect(pickEnvForBranch(cfg, 'feature/login')).toBe('dev');
+    expect(pickEnvForBranch({ branches: { main: 'prod' } }, 'feature/x')).toBeNull();
+    expect(pickEnvForBranch(null, 'main')).toBeNull();
+  });
+
+  it('resolveEnvFile: 브랜치에 맞는 .env.<환경>.age 가 있으면 그것, 없으면 .env.age', () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-flow-'));
+    writeFileSync(join(d, '.vault.json'), JSON.stringify({ branches: { main: 'prod', '*': 'dev' } }));
+    writeFileSync(join(d, '.env.prod.age'), 'x');
+    expect(resolveEnvFile({ cwd: d, branch: 'main' })).toEqual({ file: join(d, '.env.prod.age'), env: 'prod' });
+    expect(resolveEnvFile({ cwd: d, branch: 'feature/x' })).toEqual({ file: join(d, '.env.age'), env: null }); // .env.dev.age 가 없다
+    expect(resolveEnvFile({ cwd: d, branch: 'main', file: 'given.age' })).toEqual({ file: 'given.age', env: null });
+  });
+
+  it('missingNames: .env.example 이 요구하는데 금고에 없는 이름', () => {
+    expect(missingNames('OPENAI_API_KEY=\nDATABASE_URL=\n# 설명\nNEW_FLAG=\nSENTRY_DSN=', ENTRIES)).toEqual(['NEW_FLAG', 'SENTRY_DSN']);
+  });
+
+  it('findLeaks: 금고의 실제 값이 든 줄과 키 이름만 돌려준다 (값은 돌려주지 않는다)', () => {
+    const code = ['const a = 1;', `const key = "${SECRET}";`, 'fetch("postgres://u:p@host/db")', 'const n = "1";'].join('\n');
+    const leaks = findLeaks(code, [...ENTRIES, { name: 'SHORT', value: '1' }]);
+    expect(leaks).toEqual([{ line: 2, name: 'OPENAI_API_KEY' }, { line: 3, name: 'DATABASE_URL' }]);
+    expect(JSON.stringify(leaks)).not.toContain(SECRET);
+  });
+
+  it('vault-scan: 값이 든 파일이면 1로 끝나고 값은 찍지 않는다. 깨끗하면 0', () => {
+    const bad = join(dir, 'leak.js');
+    const good = join(dir, 'ok.js');
+    writeFileSync(bad, `export const k = "${SECRET}";\n`);
+    writeFileSync(good, 'export const k = process.env.OPENAI_API_KEY;\n');
+    const run = (target: string) => spawnSync(process.execPath, [bin('vault-scan.mjs'), '--file', file, target], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } });
+    const r = run(bad);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('leak.js:1  OPENAI_API_KEY');
+    expect(r.stderr).not.toContain(SECRET);
+    expect(run(good).status).toBe(0);
+  });
+
+  it('vault-check: 빠진 이름이 있으면 1', () => {
+    const ex = join(dir, '.env.example');
+    writeFileSync(ex, 'OPENAI_API_KEY=\nNEW_FLAG=\n');
+    const r = spawnSync(process.execPath, [bin('vault-check.mjs'), '--file', file, '--example', ex], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('NEW_FLAG');
+    writeFileSync(ex, 'OPENAI_API_KEY=\nDATABASE_URL=\n');
+    expect(spawnSync(process.execPath, [bin('vault-check.mjs'), '--file', file, '--example', ex], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } }).status).toBe(0);
+  });
+});

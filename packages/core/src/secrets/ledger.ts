@@ -53,6 +53,36 @@ export function envForProject(notes: Note[], scope: Scope): EnvEntry[] {
   return [...picked.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, v]) => ({ name, value: v.value }));
 }
 
+export type MatrixCell = { note: SecretNote; /** own: 그 환경의 값, shared: 공통 값을 물려받음 */ state: 'own' | 'shared' };
+export type EnvMatrix = {
+  envs: string[];
+  rows: { name: string; shared: SecretNote | null; cells: Record<string, MatrixCell | null> }[];
+  /** 다른 환경에는 있는데 이 환경에는 없는 것 */
+  missing: { name: string; env: string }[];
+};
+
+/**
+ * 환경 비교표 (docs/STRATEGY.md 계획 8). 프로젝트의 키를 행, 환경을 열로 펼친다.
+ * 칸이 비어 있으면(그 환경의 값도, 공통 값도 없으면) 빠진 것이다. 배포하고 나서야 알게 되는 "변수 하나 빠짐"을 미리 본다.
+ */
+export function envMatrix(notes: Note[], project: string | null): EnvMatrix {
+  const mine = notes.filter((n): n is SecretNote => live(n) && n.folder === project);
+  const envs = [...new Set(mine.map((n) => n.secret.env).filter((e): e is string => e !== null))].sort();
+  const names = [...new Set(mine.map((n) => n.title))].sort();
+  const missing: EnvMatrix['missing'] = [];
+  const rows = names.map((name) => {
+    const shared = mine.find((n) => n.title === name && n.secret.env === null) ?? null;
+    const cells: Record<string, MatrixCell | null> = {};
+    for (const env of envs) {
+      const own = mine.find((n) => n.title === name && n.secret.env === env);
+      cells[env] = own ? { note: own, state: 'own' } : shared ? { note: shared, state: 'shared' } : null;
+      if (!cells[env]) missing.push({ name, env });
+    }
+    return { name, shared, cells };
+  });
+  return { envs, rows, missing };
+}
+
 export type SecretIssue = 'public-name' | 'expired' | 'expiring' | 'live-in-dev';
 
 const EXPIRING_DAYS = 14;

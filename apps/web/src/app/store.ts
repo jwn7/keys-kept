@@ -56,6 +56,8 @@ export type AppState = Prefs & {
    * 잠그면 사라진다: 값을 디스크에 남기지 않는다.
    */
   incident: { by: { place: string } | { project: string | null }; initial: Record<string, string>; done: string[] } | null;
+  /** 프로젝트 화면을 환경 비교표로 보기 */
+  compare: boolean;
   /** .env 넣기 창. text는 붙여 넣은 내용(없으면 빈 창) */
   envImport: { text: string } | null;
   /** 캘린더가 보여주는 달 `YYYY-MM`과 고른 날 */
@@ -73,6 +75,7 @@ export type AppState = Prefs & {
   setEnvFilter(e: string | null): void;
   setEnvImport(v: { text: string } | null): void;
   setIncident(v: AppState['incident']): void;
+  setCompare(v: boolean): void;
   setCal(c: { month?: string; day?: string | null }): void;
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void;
   setLastBackup(at: string): void;
@@ -133,12 +136,13 @@ export const useApp = create<AppState>((set, get) => {
     envFilter: null,
     envImport: null,
     incident: null,
+    compare: false,
     calMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
     calDay: null,
     lastBackupAt: last,
     setScreen: (screen) => set({ screen }),
     select: (selectedId) => set({ selectedId, mobileView: selectedId ? 'editor' : 'list' }),
-    setFilter: (filter) => set({ filter, mobileView: 'list', envFilter: null }),
+    setFilter: (filter) => set({ filter, mobileView: 'list', envFilter: null, compare: false }),
     setQuery: (query) => set({ query }),
     setPalette: (paletteOpen) => set({ paletteOpen }),
     setMobileView: (mobileView) => set({ mobileView }),
@@ -146,6 +150,7 @@ export const useApp = create<AppState>((set, get) => {
     setEnvFilter: (envFilter) => set({ envFilter }),
     setEnvImport: (envImport) => set({ envImport }),
     setIncident: (incident) => set({ incident }),
+    setCompare: (compare) => set({ compare }),
     setCal: ({ month, day }) => set((s) => ({ calMonth: month ?? (day ? day.slice(0, 7) : s.calMonth), calDay: day !== undefined ? day : s.calDay })),
     setPref: (k, v) => {
       set({ [k]: v } as Partial<AppState>);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { compromisedBy, detectKey, envAgeFileName, formatEnv, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
+import { compromisedBy, detectKey, envAgeFileName, envMatrix, formatEnv, generateSecret, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
 import { useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
@@ -189,6 +189,26 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
           <button type="button" className="btn btn-primary btn-sm" disabled={!value} onClick={() => void copySecret(value)}>{K.copy}</button>
         </div>
       </div>
+      {!value && (
+        <div className="secret-generate">
+          <span className="muted">{K.generate}</span>
+          {(['base64url', 'hex', 'password'] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className="chip chip-add"
+              onClick={() => {
+                const v = generateSecret(kind);
+                setValue(v);
+                save({ value: v });
+                ui.toast(K.generated);
+              }}
+            >
+              {K.generateKinds[kind]}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="secret-grid">
         <div className="field">
           <label htmlFor="secret-env">{K.env}</label>
@@ -425,6 +445,73 @@ export function IncidentView() {
           ))}
         </>
       )}
+    </div>
+  );
+}
+
+// ---------- 환경 비교표 ----------
+
+/**
+ * 프로젝트의 키를 행, 환경을 열로. 빠진 칸은 붉게 "없음"으로 보이고, 누르면 그 환경에 그 이름으로 새 키를 만든다.
+ * 값이 있는 칸은 누르면 복사한다(꺼내 쓰는 길을 여기서도 짧게).
+ */
+export function CompareTable({ project }: { project: string | null }) {
+  const app = useApp((s) => s.app);
+  const notes = useApp((s) => s.notes);
+  const select = useApp((s) => s.select);
+  const m = useMemo(() => envMatrix(notes, project), [notes, project]);
+  const add = async (name: string, env: string) => {
+    const n = await app.session.save({ title: name, folder: project, secret: { value: '', env, usedIn: [] } });
+    select(n.id);
+  };
+  if (m.envs.length === 0) return <p className="agenda-empty">{K.compareNoEnv}</p>;
+  return (
+    <div className="compare">
+      <p className={`compare-summary${m.missing.length ? ' warn' : ''}`}>{K.compareMissingCount(m.missing.length)}</p>
+      <div className="compare-scroll">
+        <table className="compare-table">
+          <thead>
+            <tr>
+              <th scope="col">{K.compareName}</th>
+              {m.envs.map((e) => (
+                <th key={e} scope="col">{e}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {m.rows.map((r) => (
+              <tr key={r.name}>
+                <th scope="row">{r.name}</th>
+                {m.envs.map((e) => {
+                  const c = r.cells[e];
+                  if (!c) {
+                    return (
+                      <td key={e}>
+                        <button type="button" className="compare-cell missing" aria-label={K.compareAdd(r.name, e)} onClick={() => void add(r.name, e)}>
+                          <span className="key-chip warn">{K.compareMissing}</span>
+                        </button>
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={e}>
+                      <span className="compare-cell">
+                        <button type="button" className="compare-open" onClick={() => select(c.note.id)} title={c.state === 'shared' ? K.compareInherited : undefined}>
+                          <span className="key-mask">{maskValue(c.note.secret.value) || K.noValue}</span>
+                          {c.state === 'shared' && <span className="key-chip">{K.compareShared}</span>}
+                        </button>
+                        <button type="button" className="key-copy" aria-label={K.copyOf(`${r.name} (${e})`)} disabled={!c.note.secret.value} onClick={() => void copySecret(c.note.secret.value)}>
+                          <CopyIcon />
+                        </button>
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

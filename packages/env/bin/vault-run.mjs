@@ -3,13 +3,16 @@
 // .env.age를 풀어 그 명령의 환경변수로만 넣고 실행한다. 평문은 디스크에 닿지 않는다.
 import { spawn } from 'node:child_process';
 import { getPassphrase, needsShell, readEnvAge } from '../src/index.mjs';
+import { resolveEnvFile } from '../src/flow.mjs';
 
 const argv = process.argv.slice(2);
 const sep = argv.indexOf('--');
 const opts = sep >= 0 ? argv.slice(0, sep) : [];
 const cmd = sep >= 0 ? argv.slice(sep + 1) : argv;
 const fileAt = opts.indexOf('--file');
-const file = fileAt >= 0 ? opts[fileAt + 1] : (process.env.VAULT_ENV_FILE ?? '.env.age');
+// 파일을 안 주면: .vault.json의 브랜치 → 환경 규칙으로 .env.<환경>.age 를 고르고, 없으면 .env.age
+const { file, env: branchEnv } = resolveEnvFile({ file: fileAt >= 0 ? opts[fileAt + 1] : undefined });
+if (branchEnv) console.error(`vault-run: 지금 브랜치의 환경은 ${branchEnv}`);
 
 if (cmd.length === 0 || !file) {
   console.error('사용법: vault-run [--file .env.age] -- <명령> [인자…]\n예:     vault-run -- npm run dev');

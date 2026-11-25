@@ -188,3 +188,32 @@ test('살펴볼 것과 사고 모드: 경고가 있는 키가 첫 화면에 오�
   await expect(page.locator('.incident-row', { hasText: 'OPENAI_API_KEY' })).toContainText('값을 바꿈');
   await expect(page.locator('.incident-progress')).toContainText('전부 바꿨습니다.');
 });
+
+test('환경 비교표: 한 환경에만 빠진 값을 찾아 주고, 빠진 칸에서 새 값을 만들어 채운다', async ({ page }) => {
+  await setup(page);
+  const importEnv = async (env: string, lines: string[]) => {
+    await page.getByRole('button', { name: '.env 넣기' }).click();
+    const dialog = page.getByRole('dialog', { name: '.env 넣기' });
+    await dialog.getByPlaceholder('프로젝트 이름').fill('shop');
+    await dialog.locator('input.secret-env').nth(1).fill(env);
+    await dialog.getByRole('textbox', { name: '.env 내용을 붙여 넣으세요' }).fill(lines.join('\n'));
+    await dialog.getByRole('button', { name: /개 넣기/ }).click();
+    await expect(dialog).toHaveCount(0);
+  };
+  await importEnv('dev', ['API_URL=https://dev.example.com', 'SESSION_SECRET=dev-session-secret-value', `OPENAI_API_KEY=${OPENAI}`]);
+  await importEnv('prod', ['API_URL=https://example.com', `OPENAI_API_KEY=${OPENAI}`]);
+
+  await page.getByRole('button', { name: '환경 비교' }).click();
+  const table = page.locator('.compare-table');
+  await expect(table.locator('thead th')).toHaveText(['이름', 'dev', 'prod']);
+  await expect(table.locator('tbody tr')).toHaveCount(3);
+  await expect(page.locator('.compare-summary')).toHaveText('빠진 값 1개');
+  await expect(table).not.toContainText('dev-session-secret-value'); // 표에서도 값은 가려서
+
+  // prod에 빠진 SESSION_SECRET을 그 자리에서 만든다
+  await page.getByRole('button', { name: 'prod에 SESSION_SECRET 추가' }).click();
+  await expect(page.locator('.editor-title')).toHaveValue('SESSION_SECRET');
+  await page.locator('.secret-generate').getByRole('button', { name: '32바이트' }).click();
+  await expect(page.getByLabel('값', { exact: true })).toHaveValue(/^[A-Za-z0-9_-]{43}$/);
+  await expect(page.locator('.compare-summary')).toHaveText('빠진 값이 없습니다');
+});
