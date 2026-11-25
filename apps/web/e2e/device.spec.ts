@@ -29,8 +29,9 @@ test('패스키로 잠금 해제 (가상 인증기, WebAuthn PRF)', async ({ pag
   await page.locator('.sidebar').getByRole('button', { name: '설정' }).click();
   const toggle = page.getByRole('switch', { name: '지문이나 Windows Hello로 열기' });
   await expect(toggle).toBeEnabled();
-  await toggle.check();
+  await toggle.click(); // 인증이 끝난 뒤에 켜지므로 check()가 아니라 click 후 안내를 기다린다
   await expect(page.getByText('켰습니다. 다음부터 잠금 화면에서 쓸 수 있습니다.')).toBeVisible();
+  await expect(toggle).toBeChecked();
 
   await page.getByRole('button', { name: '메모로 돌아가기' }).click();
   await page.getByRole('button', { name: '잠금', exact: true }).click();
@@ -42,7 +43,7 @@ test('패스키로 잠금 해제 (가상 인증기, WebAuthn PRF)', async ({ pag
 
   // 끄면 잠금 화면에서 버튼이 사라진다
   await page.locator('.sidebar').getByRole('button', { name: '설정' }).click();
-  await page.getByRole('switch', { name: '지문이나 Windows Hello로 열기' }).uncheck();
+  await page.getByRole('switch', { name: '지문이나 Windows Hello로 열기' }).click();
   await expect(page.getByText('껐습니다. 비밀번호로만 엽니다.')).toBeVisible();
   await page.getByRole('button', { name: '메모로 돌아가기' }).click();
   await page.getByRole('button', { name: '잠금', exact: true }).click();
