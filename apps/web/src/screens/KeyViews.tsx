@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { compromisedBy, detectKey, envAgeFileName, envMatrix, formatEnv, generateSecret, isShareIdentity, isShareRecipient, newShareIdentity, openEnvWith, recipientFingerprint, recipientOf, sealEnvFor, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
 import { registerEditorFlush, useApp } from '../app/store';
 import { ui } from '../app/ui';
@@ -674,17 +674,22 @@ export function ExportMenu({ onCopy, onSealed, onShare, onPlain }: { onCopy: () 
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-  const item = (label: string, run: () => void, muted = false) => (
+  const hintId = useId();
+  // 이름은 label 그대로 두고(화면 읽기·테스트가 찾는 이름), 한 줄 설명은 aria-describedby로 따로 잇는다.
+  const item = (key: keyof typeof K.exportHint, label: string, run: () => void, muted = false) => (
     <button
       type="button"
       role="menuitem"
-      className={muted ? 'muted' : undefined}
+      className={muted ? 'with-hint muted' : 'with-hint'}
+      aria-label={label}
+      aria-describedby={`${hintId}-${key}`}
       onClick={() => {
         setOpen(false);
         run();
       }}
     >
-      {label}
+      <span>{label}</span>
+      <span id={`${hintId}-${key}`} className="menu-hint">{K.exportHint[key]}</span>
     </button>
   );
   return (
@@ -692,10 +697,11 @@ export function ExportMenu({ onCopy, onSealed, onShare, onPlain }: { onCopy: () 
       <button type="button" className="btn btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{K.exportMenu}</button>
       {open && (
         <div role="menu" className="menu">
-          {item(K.exportCopy, onCopy)}
-          {item(K.sealed, onSealed)}
-          {item(K.share.open, onShare)}
-          {item(K.download, onPlain, true)}
+          {item('copy', K.exportCopy, onCopy)}
+          {item('sealed', K.sealed, onSealed)}
+          {item('share', K.share.open, onShare)}
+          <div className="menu-sep" role="separator" />
+          {item('plain', K.download, onPlain, true)}
         </div>
       )}
     </span>

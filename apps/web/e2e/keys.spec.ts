@@ -151,6 +151,9 @@ test('.env 넣기: 항목으로 나누고, 공개되는 이름에 비밀 키가 
 
   // 다시 .env로
   await page.getByRole('button', { name: '꺼내기' }).click();
+  // 항목마다 한 줄 설명이 붙는다. 이름은 그대로라서 '내려받기'는 평문 항목 하나만 가리킨다.
+  await expect(page.getByRole('menuitem', { name: '내려받기', exact: true })).toHaveAccessibleDescription('암호화하지 않은 .env. 이 기기에 평문이 남습니다');
+  await expect(page.getByRole('menu').getByText('30초 뒤 클립보드를 비웁니다')).toBeVisible();
   await page.getByRole('menuitem', { name: '.env 복사' }).click();
   await expect(page.getByText('.env 4줄을 복사했습니다.')).toBeVisible();
   const text = await clipboard(page);

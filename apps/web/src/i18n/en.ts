@@ -379,6 +379,12 @@ export const en: Strings = {
     importRun: (n: number) => `Import ${n}`,
     imported: (a: number, u: number) => `Imported. ${a} added, ${u} changed.`,
     exportMenu: 'Export',
+    exportHint: {
+      copy: 'The clipboard is cleared in 30 seconds',
+      sealed: 'An .env.age file. Run with vault-run, no plaintext',
+      share: 'A file locked with the recipient’s public key',
+      plain: 'Unencrypted .env. Plaintext stays on this device',
+    },
     exportCopy: 'Copy .env',
     download: 'Download',
     downloadTitle: 'Download as a .env file?',

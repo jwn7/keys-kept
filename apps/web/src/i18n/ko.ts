@@ -373,6 +373,12 @@ const korean = {
     importRun: (n: number) => `${n}개 넣기`,
     imported: (a: number, u: number) => `넣었습니다. 추가 ${a}개, 값 바뀜 ${u}개.`,
     exportMenu: '꺼내기',
+    exportHint: {
+      copy: '30초 뒤 클립보드를 비웁니다',
+      sealed: '.env.age 파일. vault-run으로 평문 없이 실행',
+      share: '받는 사람의 공개키로 잠근 파일',
+      plain: '암호화하지 않은 .env. 이 기기에 평문이 남습니다',
+    },
     exportCopy: '.env 복사',
     download: '내려받기',
     downloadTitle: '.env 파일로 내려받을까요?',
