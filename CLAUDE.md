@@ -6,6 +6,7 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 ## 현재 상태
 - 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 98개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
 - 왜 쓰는가·KPI·자동으로 도와주는 것: `docs/KPI.md` (오늘 화면, 할 일 모음, 날짜 말, 관련 메모, 복습은 `apps/web/src/app/assist.ts`의 순수 함수)
+- 시장에서의 자리와 다음 기술 방향(암호화된 뜻 색인): `docs/STRATEGY.md`
 - 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
 
 ## 절대 규칙 (바꾸려면 사용자에게 먼저 확인)
