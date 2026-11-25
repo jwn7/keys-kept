@@ -1,0 +1,9 @@
+{
+  "name": "vault-experiment-semantic-search",
+  "private": true,
+  "type": "module",
+  "description": "실험 전용. 앱에 들어가지 않으며 pnpm 워크스페이스에 속하지 않는다.",
+  "dependencies": {
+    "@huggingface/transformers": "4.3.2"
+  }
+}

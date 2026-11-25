@@ -1,0 +1,80 @@
+{
+  "model": "onnx-community/embeddinggemma-300m-ONNX",
+  "dtype": "q4",
+  "dim": 768,
+  "notes": 300,
+  "queries": 60,
+  "diskMB": 219,
+  "loadSec": 25.4,
+  "indexSec": 20.8,
+  "perNoteMs": 69.2,
+  "est1000Sec": 69,
+  "queryMsMedian": 36.6,
+  "rssMB": 565,
+  "table": [
+    {
+      "system": "and",
+      "hit@5 all": "33%",
+      "para": "0%",
+      "cross": "0%",
+      "key": "100%",
+      "MRR": "0.33"
+    },
+    {
+      "system": "or",
+      "hit@5 all": "45%",
+      "para": "32%",
+      "cross": "0%",
+      "key": "95%",
+      "MRR": "0.42"
+    },
+    {
+      "system": "semantic",
+      "hit@5 all": "97%",
+      "para": "92%",
+      "cross": "100%",
+      "key": "100%",
+      "MRR": "0.94"
+    },
+    {
+      "system": "hybrid",
+      "hit@5 all": "88%",
+      "para": "72%",
+      "cross": "100%",
+      "key": "100%",
+      "MRR": "0.79"
+    },
+    {
+      "system": "andFirst",
+      "hit@5 all": "97%",
+      "para": "92%",
+      "cross": "100%",
+      "key": "100%",
+      "MRR": "0.94"
+    }
+  ],
+  "misses": [
+    {
+      "q": "이 닦으러 가는 날이 언제였지",
+      "type": "para",
+      "gold": "n01",
+      "rank": 154,
+      "top": [
+        "Standup 3월 6일",
+        "Standup 3월 9일",
+        "Standup 7월 1일"
+      ]
+    },
+    {
+      "q": "누가 뭘 하기로 했는지 지난번 미팅",
+      "type": "para",
+      "gold": "n03",
+      "rank": 10,
+      "top": [
+        "Standup 11월 8일",
+        "Standup 3월 27일",
+        "Standup 11월 23일"
+      ]
+    }
+  ]
+}

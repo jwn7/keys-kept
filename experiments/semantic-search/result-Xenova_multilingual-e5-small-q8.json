@@ -1,0 +1,190 @@
+{
+  "model": "Xenova/multilingual-e5-small",
+  "dtype": "q8",
+  "dim": 384,
+  "notes": 300,
+  "queries": 60,
+  "diskMB": 135,
+  "loadSec": 1.5,
+  "indexSec": 1.8,
+  "perNoteMs": 5.9,
+  "est1000Sec": 6,
+  "queryMsMedian": 5.4,
+  "rssMB": 622,
+  "table": [
+    {
+      "system": "and",
+      "hit@5 all": "33%",
+      "para": "0%",
+      "cross": "0%",
+      "key": "100%",
+      "MRR": "0.33"
+    },
+    {
+      "system": "or",
+      "hit@5 all": "45%",
+      "para": "32%",
+      "cross": "0%",
+      "key": "95%",
+      "MRR": "0.42"
+    },
+    {
+      "system": "semantic",
+      "hit@5 all": "78%",
+      "para": "80%",
+      "cross": "53%",
+      "key": "95%",
+      "MRR": "0.70"
+    },
+    {
+      "system": "hybrid",
+      "hit@5 all": "75%",
+      "para": "72%",
+      "cross": "47%",
+      "key": "100%",
+      "MRR": "0.63"
+    },
+    {
+      "system": "andFirst",
+      "hit@5 all": "80%",
+      "para": "80%",
+      "cross": "53%",
+      "key": "100%",
+      "MRR": "0.74"
+    }
+  ],
+  "misses": [
+    {
+      "q": "이 닦으러 가는 날이 언제였지",
+      "type": "para",
+      "gold": "n01",
+      "rank": 214,
+      "top": [
+        "할 일 4월 13일",
+        "할 일 12월 21일",
+        "할 일 12월 12일"
+      ]
+    },
+    {
+      "q": "누가 뭘 하기로 했는지 지난번 미팅",
+      "type": "para",
+      "gold": "n03",
+      "rank": 147,
+      "top": [
+        "할 일 12월 24일",
+        "할 일 12월 18일",
+        "할 일 12월 3일"
+      ]
+    },
+    {
+      "q": "애 주사 맞히는 날",
+      "type": "para",
+      "gold": "n13",
+      "rank": 149,
+      "top": [
+        "일기 11월 11일",
+        "일기 11월 2일",
+        "일기 11월 5일"
+      ]
+    },
+    {
+      "q": "잠이 안 올 때 해 볼 것",
+      "type": "para",
+      "gold": "n16",
+      "rank": 17,
+      "top": [
+        "일기 11월 2일",
+        "일기 3월 15일",
+        "일기 3월 3일"
+      ]
+    },
+    {
+      "q": "데이터베이스 조회가 느릴 때",
+      "type": "para",
+      "gold": "n24",
+      "rank": 95,
+      "top": [
+        "태호 1:1",
+        "태호 1:1",
+        "태호 1:1"
+      ]
+    },
+    {
+      "q": "dentist appointment",
+      "type": "cross",
+      "gold": "n01",
+      "rank": 40,
+      "top": [
+        "Standup 3월 21일",
+        "Standup 3월 27일",
+        "Standup 7월 19일"
+      ]
+    },
+    {
+      "q": "lease renewal deposit",
+      "type": "cross",
+      "gold": "n02",
+      "rank": 39,
+      "top": [
+        "Landlord call notes",
+        "Tax documents",
+        "Standup 3월 18일"
+      ]
+    },
+    {
+      "q": "Jeju trip itinerary",
+      "type": "cross",
+      "gold": "n11",
+      "rank": 17,
+      "top": [
+        "Standup 11월 17일",
+        "Standup 3월 12일",
+        "Standup 11월 23일"
+      ]
+    },
+    {
+      "q": "도쿄 가는 비행기",
+      "type": "cross",
+      "gold": "n31",
+      "rank": 38,
+      "top": [
+        "태호 1:1",
+        "태호 1:1",
+        "태호 1:1"
+      ]
+    },
+    {
+      "q": "집주인이랑 통화한 내용",
+      "type": "cross",
+      "gold": "n32",
+      "rank": 278,
+      "top": [
+        "전세 계약 갱신",
+        "이사 체크리스트",
+        "1984 밑줄"
+      ]
+    },
+    {
+      "q": "요청 횟수 제한 설계",
+      "type": "cross",
+      "gold": "n34",
+      "rank": 39,
+      "top": [
+        "상담 3회차 메모",
+        "태호 1:1",
+        "태호 1:1"
+      ]
+    },
+    {
+      "q": "마라톤 훈련 계획",
+      "type": "cross",
+      "gold": "n36",
+      "rank": 37,
+      "top": [
+        "러닝 기록",
+        "운동 6월 18일",
+        "읽은 책: 아주 작은 습관의 힘"
+      ]
+    }
+  ]
+}

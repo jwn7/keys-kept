@@ -1,0 +1,102 @@
+{
+  "model": "onnx-community/embeddinggemma-2-ONNX",
+  "dtype": "q4",
+  "dim": 768,
+  "notes": 300,
+  "queries": 60,
+  "diskMB": 505,
+  "loadSec": 57.5,
+  "indexSec": 21,
+  "perNoteMs": 70,
+  "est1000Sec": 70,
+  "queryMsMedian": 57.2,
+  "rssMB": 891,
+  "table": [
+    {
+      "system": "and",
+      "hit@5 all": "33%",
+      "para": "0%",
+      "cross": "0%",
+      "key": "100%",
+      "MRR": "0.33"
+    },
+    {
+      "system": "or",
+      "hit@5 all": "45%",
+      "para": "32%",
+      "cross": "0%",
+      "key": "95%",
+      "MRR": "0.42"
+    },
+    {
+      "system": "semantic",
+      "hit@5 all": "93%",
+      "para": "88%",
+      "cross": "93%",
+      "key": "100%",
+      "MRR": "0.92"
+    },
+    {
+      "system": "hybrid",
+      "hit@5 all": "90%",
+      "para": "80%",
+      "cross": "93%",
+      "key": "100%",
+      "MRR": "0.78"
+    },
+    {
+      "system": "andFirst",
+      "hit@5 all": "93%",
+      "para": "88%",
+      "cross": "93%",
+      "key": "100%",
+      "MRR": "0.92"
+    }
+  ],
+  "misses": [
+    {
+      "q": "이 닦으러 가는 날이 언제였지",
+      "type": "para",
+      "gold": "n01",
+      "rank": 77,
+      "top": [
+        "할 일 8월 23일",
+        "할 일 4월 19일",
+        "할 일 12월 18일"
+      ]
+    },
+    {
+      "q": "누가 뭘 하기로 했는지 지난번 미팅",
+      "type": "para",
+      "gold": "n03",
+      "rank": 13,
+      "top": [
+        "일기 11월 23일",
+        "Standup 3월 18일",
+        "Standup 7월 16일"
+      ]
+    },
+    {
+      "q": "애 주사 맞히는 날",
+      "type": "para",
+      "gold": "n13",
+      "rank": 73,
+      "top": [
+        "일기 11월 23일",
+        "일기 11월 5일",
+        "일기 11월 17일"
+      ]
+    },
+    {
+      "q": "집주인이랑 통화한 내용",
+      "type": "cross",
+      "gold": "n32",
+      "rank": 45,
+      "top": [
+        "일기 11월 26일",
+        "할 일 12월 27일",
+        "태호 1:1"
+      ]
+    }
+  ]
+}
