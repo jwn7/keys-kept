@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Vault — 나만 여는 키 장부',
+        name: 'Vault — Keys, kept.',
         short_name: 'Vault',
         description: 'API 키와 환경변수를 기기에서 잠그는 키 장부',
         lang: 'ko',

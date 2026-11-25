@@ -13,11 +13,10 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 export const en: Strings = {
   app: {
     name: 'Vault',
-    tagline: 'A key ledger only you can open',
-    taglineLines: ['A key ledger', 'only you can open'],
-    // The red seal is the logo mark (封緘, "sealed shut"), so it stays as it is in every language. It is hidden from screen readers.
-    sealMark: '봉',
-    sealHero: ['봉', '함'],
+    tagline: 'Keys, kept.',
+    taglineLines: ['Keys,', 'kept.'],
+    // The red seal is the logo mark: the first letter of the name, the same in every language. It is hidden from screen readers.
+    sealMark: 'V',
     sees: [
       { label: 'What the server sees', value: 'Item count, modified times, sizes' },
       { label: 'What it cannot see', value: 'Key names and values, projects, where keys are used, notes' },

@@ -7,7 +7,7 @@ import { usePasswordScore } from '../app/strength';
 import { GOOGLE_CLIENT_ID } from '../app/session';
 import { evaluatePasskey } from '../app/passkey';
 import { markInstalled, markUnlock } from '../app/metrics';
-import { Logo, Seal } from '../components/Seal';
+import { Logo } from '../components/Seal';
 
 type Mode = 'password' | 'recovery' | 'restore';
 
@@ -32,7 +32,6 @@ export function UnlockScreen({ firstRun }: { firstRun: boolean }) {
       <section className="unlock-left">
         <Logo fontSize={18} />
         <div className="unlock-pitch">
-          <Seal size="hero" />
           <h1>
             {ko.app.taglineLines[0]}
             <br />

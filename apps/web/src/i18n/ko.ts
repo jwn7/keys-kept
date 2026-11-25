@@ -7,10 +7,10 @@ import { en } from './en';
 const korean = {
   app: {
     name: 'Vault',
-    tagline: '나만 여는 키 장부',
-    taglineLines: ['나만 여는', '키 장부'],
-    sealMark: '봉',
-    sealHero: ['봉', '함'],
+    // 소개 문구는 상표처럼 쓴다: 어느 언어 화면에서도 같은 영어 두 낱말 (2026-11-25 사용자 결정)
+    tagline: 'Keys, kept.',
+    taglineLines: ['Keys,', 'kept.'],
+    sealMark: 'V',
     sees: [
       { label: '서버가 보는 것', value: '메모 개수, 수정 시각, 크기' },
       { label: '서버가 못 보는 것', value: '키 이름과 값, 프로젝트, 쓰이는 곳, 메모' },

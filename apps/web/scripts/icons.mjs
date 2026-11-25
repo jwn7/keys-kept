@@ -15,7 +15,7 @@ for (const size of [192, 512]) {
     async ({ svg, size }) => {
       document.body.innerHTML = `<div id="icon" style="width:${size}px;height:${size}px;position:fixed;inset:0;z-index:9999">${svg}</div>`;
       document.querySelector('#icon svg').setAttribute('style', 'width:100%;height:100%;display:block');
-      await document.fonts.load("600 27px 'Hahmlet'", '봉');
+      await document.fonts.load("600 27px 'Hahmlet'", 'V');
       await document.fonts.ready;
     },
     { svg, size },
