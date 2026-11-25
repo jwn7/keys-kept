@@ -166,6 +166,47 @@ describe('VaultSession', () => {
     expect(plain.date ?? null).toBeNull();
   });
 
+  it('기기 잠금 해제(패스키): 비밀값으로 감싼 열쇠를 이 기기에만 두고, 그 값으로 다시 연다', async () => {
+    const s = make();
+    await s.setup('pw');
+    await s.save({ title: '메모', body: '본문' });
+    expect(await s.deviceUnlockInfo()).toBeNull();
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    await s.enableDeviceUnlock(secret, { credentialId: 'cred-1', prfSalt: 'c2FsdA==' });
+    expect(await s.deviceUnlockInfo()).toEqual({ credentialId: 'cred-1', prfSalt: 'c2FsdA==' });
+    // 서버에는 아무것도 추가되지 않는다 (감싼 열쇠는 이 기기 전용)
+    expect(JSON.stringify(await backend.getKeys())).not.toContain('cred-1');
+
+    s.lock();
+    await expect(s.unlockWithDeviceSecret(crypto.getRandomValues(new Uint8Array(32)))).rejects.toBeInstanceOf(WrongPasswordError);
+    expect(s.isLocked).toBe(true);
+    await s.unlockWithDeviceSecret(secret);
+    expect(s.list().map((n) => n.title)).toEqual(['메모']);
+
+    // 비밀번호를 바꿔도 기기 잠금 해제는 그대로 (itemsKey는 같다)
+    await s.changePassword('pw', '새 비밀번호');
+    s.lock();
+    await s.unlockWithDeviceSecret(secret);
+    expect(s.isLocked).toBe(false);
+
+    await s.disableDeviceUnlock();
+    expect(await s.deviceUnlockInfo()).toBeNull();
+    s.lock();
+    await expect(s.unlockWithDeviceSecret(secret)).rejects.toThrow();
+  });
+
+  it('sealLocal/openLocal: 이 기기에만 두는 설정값을 itemsKey로 잠근다 (잠겨 있으면 못 연다)', async () => {
+    const s = make();
+    await s.setup('pw');
+    const sealed = s.sealLocal('백업 비밀번호 1234');
+    expect(sealed).not.toContain('1234');
+    expect(s.openLocal(sealed)).toBe('백업 비밀번호 1234');
+    expect(s.openLocal('엉터리')).toBeNull();
+    expect(s.sealLocal('같은 값')).not.toBe(s.sealLocal('같은 값'));
+    s.lock();
+    expect(() => s.openLocal(sealed)).toThrow(LockedError);
+  });
+
   it('delete → tombstone: list에서 빠지고 blob은 deletedAt 설정, outbox delete', async () => {
     const s = make();
     await s.setup('pw');

@@ -14,6 +14,18 @@ export type MetaMap = {
   deviceName: string;
   backend: 'memory' | 'drive' | 'supabase';
   itemsKeyRecord: ItemsKeyRecord;
+  /** 패스키(지문·Windows Hello)로 여는 데 쓰는, 이 기기 전용 감싼 열쇠. 서버로 가지 않는다. */
+  deviceUnlock: DeviceUnlockRecord;
+};
+
+export type DeviceUnlockRecord = {
+  /** WebAuthn credential id (base64url) */
+  credentialId: string;
+  /** PRF 평가에 넣는 salt (base64) */
+  prfSalt: string;
+  /** 인증기가 준 비밀값에서 만든 키로 감싼 itemsKey */
+  wrappedKey: string;
+  createdAt: string;
 };
 export type MetaKey = keyof MetaMap;
 type MetaRow = { key: MetaKey; value: unknown };
@@ -111,6 +123,9 @@ export class LocalStore {
   }
   async setMeta<K extends MetaKey>(key: K, value: MetaMap[K]): Promise<void> {
     await this.db.meta.put({ key, value });
+  }
+  async deleteMeta(key: MetaKey): Promise<void> {
+    await this.db.meta.delete(key);
   }
 
   // ---- lifecycle ----

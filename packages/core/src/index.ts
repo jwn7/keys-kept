@@ -22,3 +22,4 @@ export { parseMarkdownFiles } from './backup/markdownImport';
 export type { MarkdownFile } from './backup/markdownImport';
 export { VaultSession, LockedError, VaultMismatchError, WrongPasswordError, NotSetUpError, extractTags, isConflictCopy } from './session/VaultSession';
 export type { VaultSessionOptions, NoteInput, SessionEvent } from './session/VaultSession';
+export type { DeviceUnlockRecord } from './store/LocalStore';

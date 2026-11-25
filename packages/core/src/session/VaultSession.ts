@@ -3,6 +3,8 @@ import { deriveKey, newKdfParams } from '../crypto/kdf';
 import { newItemsKey, newRecoveryPhrase, recoveryKey, unwrap, wrap } from '../crypto/keys';
 import { decryptNote, encryptNote } from '../crypto/item';
 import { DecryptError } from '../crypto/errors';
+import { open, seal } from '../crypto/aead';
+import { fromBase64, fromUtf8, toBase64, toUtf8 } from '../model/codec';
 import type { LocalStore } from '../store/LocalStore';
 import { OfflineError, type SyncBackend } from '../sync/SyncBackend';
 import { SyncEngine, type SyncResult } from '../sync/SyncEngine';
@@ -58,6 +60,10 @@ export type SessionEvent =
   | { type: 'lock'; locked: boolean };
 
 const CONFLICT_MARK = ' (충돌 사본 — ';
+/** 기기 잠금 해제용 키를 뽑을 때 섞는 용도 문자열 (다른 용도의 해시와 겹치지 않게) */
+const DEVICE_UNLOCK_CONTEXT = 'vault:deviceUnlock:v1';
+const LOCAL_AAD = 'vault:local:v1';
+const DEVICE_SECRET_BYTES = 32;
 
 /** 충돌에서 진 쪽을 보존한 메모인지 (목록에 빨간 표시). */
 export function isConflictCopy(note: Pick<Note, 'title'>): boolean {
@@ -196,6 +202,69 @@ export class VaultSession {
       await this.unlockWith(rKey, record.wrappedKeyRecovery, record);
     } finally {
       sodium.memzero(rKey);
+    }
+  }
+
+  // ---- 기기 잠금 해제 (패스키) ----
+  //
+  // 인증기(지문·Windows Hello)가 매번 같은 32바이트 비밀값을 돌려준다(WebAuthn PRF). 그 값으로 itemsKey를
+  // 한 번 더 감싸 이 기기에만 둔다. 비밀값도, 거기서 만든 키도 저장하지 않는다 — 열 때마다 인증기가 다시 만든다.
+  // 비밀번호·복구 키 경로는 그대로 남는다. 감싼 열쇠는 서버로 가지 않는다.
+
+  /** 이 기기에서 패스키 잠금 해제를 켠다. 잠금 해제 상태에서만. */
+  async enableDeviceUnlock(secret: Uint8Array, info: { credentialId: string; prfSalt: string }): Promise<void> {
+    const itemsKey = this.requireUnlocked();
+    await ready();
+    const key = deviceKey(secret);
+    try {
+      await this.store.setMeta('deviceUnlock', { ...info, wrappedKey: wrap(key, itemsKey), createdAt: new Date().toISOString() });
+    } finally {
+      sodium.memzero(key);
+    }
+  }
+
+  /** 켜져 있으면 인증기에 넘길 정보(평문 아님). 잠금 화면이 버튼을 보여줄지 정한다. */
+  async deviceUnlockInfo(): Promise<{ credentialId: string; prfSalt: string } | null> {
+    const rec = await this.store.getMeta('deviceUnlock');
+    return rec ? { credentialId: rec.credentialId, prfSalt: rec.prfSalt } : null;
+  }
+
+  async disableDeviceUnlock(): Promise<void> {
+    await this.store.deleteMeta('deviceUnlock');
+  }
+
+  async unlockWithDeviceSecret(secret: Uint8Array): Promise<void> {
+    await ready();
+    const rec = await this.store.getMeta('deviceUnlock');
+    if (!rec) throw new NotSetUpError();
+    const record = await this.loadKeyRecord();
+    const key = deviceKey(secret);
+    try {
+      await this.unlockWith(key, rec.wrappedKey, record);
+    } finally {
+      sodium.memzero(key);
+    }
+  }
+
+  /**
+   * 이 기기에만 두는 작은 값(예: 자동 백업 비밀번호)을 itemsKey로 잠근다. 돌려준 문자열은 localStorage에 둬도 된다.
+   * 잠금 해제 상태에서만 만들고 열 수 있다.
+   */
+  sealLocal(text: string): string {
+    const itemsKey = this.requireUnlocked();
+    const { nonce, ciphertext } = seal(itemsKey, fromUtf8(text), fromUtf8(LOCAL_AAD));
+    return `${toBase64(nonce)}.${toBase64(ciphertext)}`;
+  }
+
+  /** 형식이 틀리거나 다른 볼트의 값이면 null. */
+  openLocal(sealed: string): string | null {
+    const itemsKey = this.requireUnlocked();
+    const [n, c] = sealed.split('.');
+    if (!n || !c) return null;
+    try {
+      return toUtf8(open(itemsKey, fromBase64(n), fromBase64(c), fromUtf8(LOCAL_AAD)));
+    } catch {
+      return null;
     }
   }
 
@@ -546,6 +615,15 @@ export class VaultSession {
     this.versions.set(copy.id, 1);
     return item;
   }
+}
+
+/**
+ * 인증기 비밀값 → 감싸기용 키. libsodium의 키 있는 해시(BLAKE2b)에 용도 문자열을 넣어 뽑는다.
+ * 비밀값을 그대로 키로 쓰지 않는 이유: 같은 패스키를 다른 용도에 써도 키가 겹치지 않게.
+ */
+function deviceKey(secret: Uint8Array): Uint8Array {
+  if (secret.length !== DEVICE_SECRET_BYTES) throw new Error(`device secret must be ${DEVICE_SECRET_BYTES} bytes`);
+  return sodium.crypto_generichash(32, fromUtf8(DEVICE_UNLOCK_CONTEXT), secret);
 }
 
 /** 본문의 `#태그` 자동 인식 (SPEC §2.1). 코드 블록 안은 3단계 편집기에서 제외 처리. */
