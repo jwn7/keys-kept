@@ -6,7 +6,7 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 ## 현재 상태
 - 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 107개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
 - 왜 쓰는가·KPI·자동으로 도와주는 것: `docs/KPI.md` (오늘 화면, 할 일 모음, 날짜 말, 관련 메모, 복습은 `apps/web/src/app/assist.ts`의 순수 함수)
-- 시장에서의 자리와 다음 기술 방향(암호화된 뜻 색인): `docs/STRATEGY.md`
+- **방향과 계획은 `docs/STRATEGY.md` 하나가 정한다** (다른 문서와 다르면 그 문서가 맞다). 지금 하는 일: 저장소 검증 라이브러리. 계획에 없는 기능은 끼워 넣지 않고, 넣으려면 그 문서부터 고친다
 - 공격별 대응과 제안 중인 방어: `docs/SECURITY.md` (배포 빌드에는 CSP가 있다. 새 외부 주소에 연결하려면 `apps/web/vite.config.ts`의 허용 목록에 이유와 함께 추가)
 - 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
 
