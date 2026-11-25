@@ -3,13 +3,17 @@ on:
   push:
   pull_request:
 
+# 워크플로 토큰은 읽기만. 액션은 태그가 아니라 커밋 해시로 고정한다(태그는 바꿔치기할 수 있다). docs/SECURITY.md
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -21,15 +25,34 @@ jobs:
       - run: pnpm -r lint
       - run: pnpm -r test
 
+  # 알려진 취약점이 있는 런타임 의존성이 들어오면 실패한다.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: pnpm audit --prod --audit-level=high
+
   # 화면 흐름: 처음 설정 → 작성 → 잠금 → 다시 열기, 빠른 메모, 캘린더. 러너에 설치된 Chrome을 쓴다.
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @vault/web e2e
+      # 배포 빌드에서 콘텐츠 보안 정책이 앱을 막지 않고, 바깥으로 보내는 것은 막는지 (docs/SECURITY.md)
+      - name: CSP check on the production build
+        working-directory: apps/web
+        run: |
+          pnpm build
+          pnpm preview --port 4173 --strictPort &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:4173/ && break; sleep 1; done
+          node scripts/csp-check.mjs

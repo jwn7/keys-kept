@@ -1,3 +1,7 @@
 packages:
   - packages/*
   - apps/*
+
+# 공급망 공격 대응 (docs/SECURITY.md): 올라온 지 7일이 안 된 버전은 설치하지 않는다(단위: 분).
+# 2026년의 npm 웜들은 탈취한 계정으로 악성 버전을 올리고 수일 안에 내려갔다.
+minimumReleaseAge: 10080

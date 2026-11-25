@@ -7,6 +7,7 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 - 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 98개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
 - 왜 쓰는가·KPI·자동으로 도와주는 것: `docs/KPI.md` (오늘 화면, 할 일 모음, 날짜 말, 관련 메모, 복습은 `apps/web/src/app/assist.ts`의 순수 함수)
 - 시장에서의 자리와 다음 기술 방향(암호화된 뜻 색인): `docs/STRATEGY.md`
+- 공격별 대응과 제안 중인 방어: `docs/SECURITY.md` (배포 빌드에는 CSP가 있다. 새 외부 주소에 연결하려면 `apps/web/vite.config.ts`의 허용 목록에 이유와 함께 추가)
 - 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
 
 ## 절대 규칙 (바꾸려면 사용자에게 먼저 확인)
@@ -39,6 +40,7 @@ docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
 - `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
 - `pnpm --filter web dev` (localhost:5173)
 - `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 12개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
+- `node apps/web/scripts/csp-check.mjs` (배포 빌드의 CSP 점검, `pnpm --filter @vault/web preview` 필요)
 - `node apps/web/scripts/shots.mjs <폴더> [light|dark]` (디자인 검토용 화면 캡처, 개발 서버 필요)
 - `supabase start` / `supabase db reset` (Pro 모듈 작업 시)
 
