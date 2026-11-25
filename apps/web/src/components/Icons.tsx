@@ -75,3 +75,21 @@ export const PlusIcon = () => (
     <path d="M8 3.25v9.5M3.25 8h9.5" />
   </Svg>
 );
+export const KeyIcon = () => (
+  <Svg>
+    <circle cx="5.25" cy="10.75" r="2.5" />
+    <path d="M7.1 8.9l5.65-5.65M10.5 5.5l1.75 1.75M12.25 3.75l1 1" />
+  </Svg>
+);
+export const CopyIcon = () => (
+  <Svg>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+    <path d="M3.5 10.5h-.25A1.25 1.25 0 0 1 2 9.25v-6A1.25 1.25 0 0 1 3.25 2h6A1.25 1.25 0 0 1 10.5 3.25v.25" />
+  </Svg>
+);
+export const AlertIcon = () => (
+  <Svg>
+    <path d="M8 2.5l5.75 10.25H2.25z" />
+    <path d="M8 6.75v2.75M8 11.25v.01" />
+  </Svg>
+);

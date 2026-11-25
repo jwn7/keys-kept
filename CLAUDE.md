@@ -39,7 +39,7 @@ docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
 ## 명령
 - `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
 - `pnpm --filter web dev` (localhost:5173)
-- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 12개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
+- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 15개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
 - `node apps/web/scripts/csp-check.mjs` (배포 빌드의 CSP 점검, `pnpm --filter @vault/web preview` 필요)
 - `node apps/web/scripts/shots.mjs <폴더> [light|dark]` (디자인 검토용 화면 캡처, 개발 서버 필요)
 - `supabase start` / `supabase db reset` (Pro 모듈 작업 시)

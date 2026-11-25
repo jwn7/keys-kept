@@ -7,7 +7,7 @@ import { markOpen } from './metrics';
 import { ui } from './ui';
 import { ko } from '../i18n/ko';
 
-export type Filter = { kind: 'today' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
+export type Filter = { kind: 'today' } | { kind: 'keys' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
 export type SortKey = 'updated' | 'created' | 'title';
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 's' | 'm' | 'l';
@@ -49,6 +49,10 @@ export type AppState = Prefs & {
   mobileView: MobileView;
   /** 제목·본문에 커서가 있는 동안 true. 모바일 상단의 `완료`(키보드 내리기)를 이때만 보여준다. */
   editing: boolean;
+  /** 키 목록에서 고른 환경 (null = 전체) */
+  envFilter: string | null;
+  /** .env 넣기 창. text는 붙여 넣은 내용(없으면 빈 창) */
+  envImport: { text: string } | null;
   /** 캘린더가 보여주는 달 `YYYY-MM`과 고른 날 */
   calMonth: string;
   calDay: string | null;
@@ -61,6 +65,8 @@ export type AppState = Prefs & {
   setPalette(open: boolean): void;
   setMobileView(v: MobileView): void;
   setEditing(v: boolean): void;
+  setEnvFilter(e: string | null): void;
+  setEnvImport(v: { text: string } | null): void;
   setCal(c: { month?: string; day?: string | null }): void;
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void;
   setLastBackup(at: string): void;
@@ -118,16 +124,20 @@ export const useApp = create<AppState>((set, get) => {
     paletteOpen: false,
     mobileView: 'list',
     editing: false,
+    envFilter: null,
+    envImport: null,
     calMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
     calDay: null,
     lastBackupAt: last,
     setScreen: (screen) => set({ screen }),
     select: (selectedId) => set({ selectedId, mobileView: selectedId ? 'editor' : 'list' }),
-    setFilter: (filter) => set({ filter, mobileView: 'list' }),
+    setFilter: (filter) => set({ filter, mobileView: 'list', envFilter: null }),
     setQuery: (query) => set({ query }),
     setPalette: (paletteOpen) => set({ paletteOpen }),
     setMobileView: (mobileView) => set({ mobileView }),
     setEditing: (editing) => set({ editing }),
+    setEnvFilter: (envFilter) => set({ envFilter }),
+    setEnvImport: (envImport) => set({ envImport }),
     setCal: ({ month, day }) => set((s) => ({ calMonth: month ?? (day ? day.slice(0, 7) : s.calMonth), calDay: day !== undefined ? day : s.calDay })),
     setPref: (k, v) => {
       set({ [k]: v } as Partial<AppState>);

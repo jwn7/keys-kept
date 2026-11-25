@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { extractTags, type Note } from '@vault/core';
+import { extractTags, isSecret, type Note } from '@vault/core';
+import { SecretPanel } from './KeyViews';
 import { registerEditorFlush, useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
@@ -207,10 +208,10 @@ export function Editor() {
         </div>
         <input
           ref={titleInputRef}
-          className="editor-title"
+          className={`editor-title${note.secret ? ' key-title' : ''}`}
           aria-label={ko.editor.title}
           value={title}
-          placeholder={ko.main.untitled}
+          placeholder={note.secret ? ko.keys.namePlaceholder : ko.main.untitled}
           readOnly={inTrash}
           onChange={(e) => {
             setTitle(e.target.value);
@@ -241,6 +242,7 @@ export function Editor() {
             </>
           )}
         </div>
+        {isSecret(note) && !inTrash && <SecretPanel note={note} />}
         <div className="editor-body" ref={hostRef} />
         {!inTrash && (
           <div className="mobile-toolbar">
@@ -299,7 +301,7 @@ function DateField({ note }: { note: Note }) {
   return (
     <span className="date-field">
       <button type="button" className={`chip${note.date ? ' chip-date' : ' chip-add'}`} onClick={open}>
-        {note.date ? formatDay(note.date) : `+ ${ko.cal.setDate}`}
+        {note.date ? `${note.secret ? `${ko.keys.expiry} ` : ''}${formatDay(note.date)}` : `+ ${note.secret ? ko.keys.expiry : ko.cal.setDate}`}
       </button>
       {note.date && (
         <button type="button" className="chip-x" aria-label={ko.cal.clearDate} onClick={() => set(null)}>×</button>
@@ -379,6 +381,9 @@ function NoteMenu({ note, onFlush }: { note: Note; onFlush: () => Promise<void> 
         <div role="menu" className="menu">
           <button type="button" role="menuitem" onClick={() => void act(() => app.session.save({ id: note.id, pinned: !note.pinned }))}>{note.pinned ? ko.editor.unpin : ko.editor.pin}</button>
           <button type="button" role="menuitem" onClick={() => void act(moveFolder)}>{ko.editor.moveFolder}</button>
+          {!note.secret && (
+            <button type="button" role="menuitem" onClick={() => void act(() => app.session.save({ id: note.id, secret: { value: '', env: null, usedIn: [] } }))}>{ko.keys.toKey}</button>
+          )}
           <button type="button" role="menuitem" onClick={() => void act(async () => setProof(true))}>{ko.editor.serverView}</button>
           <button type="button" role="menuitem" className="danger" onClick={() => void act(toTrash)}>{ko.editor.delete}</button>
         </div>

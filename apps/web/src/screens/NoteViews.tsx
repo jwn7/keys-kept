@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { isConflictCopy, type Note } from '@vault/core';
+import { detectKey, isConflictCopy, isSecret, parseEnv, type Note } from '@vault/core';
+import { KeyRow } from './KeyViews';
 import { flushEditor, useApp } from '../app/store';
 import { checkTask, openTasks, parseQuickDate, reviewDue, type Task } from '../app/assist';
 import { markCapture } from '../app/metrics';
@@ -29,6 +30,22 @@ export function QuickAdd() {
   const add = async (open: boolean) => {
     const t = text.trim();
     if (!t) return;
+    // `NAME=value` 또는 알아볼 수 있는 키 값이면 메모가 아니라 키 항목으로 넣는다
+    const pair = /^(?:export\s+)?[A-Z_][A-Z0-9_]*=\S/.test(t) ? parseEnv(t)[0] : undefined;
+    const bare = pair ? null : detectKey(t);
+    if (pair || bare) {
+      setText('');
+      setNoDate(false);
+      markCapture('quick');
+      const k = await app.session.save({
+        title: pair ? pair.name : `${bare!.provider} ${bare!.kind}`,
+        folder: filter.kind === 'folder' ? filter.folder : null,
+        secret: { value: pair ? pair.value : t, env: useApp.getState().envFilter, usedIn: [] },
+      });
+      if (app.backendKind !== 'memory') app.scheduler.requestNow();
+      if (open) useApp.getState().select(k.id);
+      return;
+    }
     const when = parsed?.date ?? date;
     const [first, ...rest] = (parsed?.date ? parsed.text : t).split('\n');
     // 저장을 기다리기 전에 칸부터 비운다. 저장이 끝난 뒤에 비우면 그 사이에 친 다음 메모가 같이 지워진다.
@@ -61,6 +78,14 @@ export function QuickAdd() {
           if (!e.target.value) setNoDate(false);
         }}
         onKeyDown={onKey}
+        onPaste={(e) => {
+          // 여러 줄짜리 .env를 붙여 넣으면 한 줄로 뭉개지 않고 넣기 창을 연다
+          const pasted = e.clipboardData.getData('text');
+          if (/\n/.test(pasted) && parseEnv(pasted).length >= 2) {
+            e.preventDefault();
+            useApp.getState().setEnvImport({ text: pasted });
+          }
+        }}
         placeholder={date ? ko.quick.placeholderOn(formatDay(date)) : ko.quick.placeholder}
         aria-label={ko.quick.label}
       />
@@ -84,8 +109,13 @@ export function DateChip({ date }: { date: string | null | undefined }) {
   return <span className={`date-chip${date === today ? ' today' : ''}`}>{date === today ? ko.cal.today : formatDay(date)}</span>;
 }
 
+/** 키 항목이면 키 줄로, 아니면 메모 줄로. */
+export function NoteRow(props: { n: Note; now: number; hideDate?: boolean }) {
+  return isSecret(props.n) ? <KeyRow n={props.n} /> : <PlainRow {...props} />;
+}
+
 /** hideDate: 일정 목록 안에서는 날짜가 이미 묶음 제목에 있으므로 날짜 칩과 수정 시각을 숨긴다 */
-export function NoteRow({ n, now, hideDate }: { n: Note; now: number; hideDate?: boolean }) {
+function PlainRow({ n, now, hideDate }: { n: Note; now: number; hideDate?: boolean }) {
   const selectedId = useApp((s) => s.selectedId);
   const select = useApp((s) => s.select);
   return (

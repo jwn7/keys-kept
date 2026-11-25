@@ -1,12 +1,14 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { backupFileName, exportBackup } from '@vault/core';
+import { backupFileName, exportBackup, formatEnv, isSecret, maskValue } from '@vault/core';
+import { copySecret } from './KeyViews';
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
 import { displayTitle, matchSnippet, relTime, searchNotes, shareOrDownload } from '../app/util';
 import { ui } from '../app/ui';
 import { useNoteActions } from './MainScreen';
 
-type Item = { id: string; kind: 'note' | 'cmd'; label: string; meta?: string; key?: string; run: () => void | Promise<void> };
+/** run = Enter, alt = Shift+Enter, open = Ctrl+Enter (없으면 run) */
+type Item = { id: string; kind: 'note' | 'cmd'; label: string; meta?: string; key?: string; run: () => void | Promise<void>; alt?: () => void | Promise<void>; open?: () => void | Promise<void> };
 
 export function CommandPalette() {
   const notes = useApp((s) => s.notes);
@@ -24,14 +26,26 @@ export function CommandPalette() {
     const needle = q.trim().toLowerCase();
     const noteItems: Item[] = searchNotes(notes, needle)
       .slice(0, needle ? 20 : 6)
-      .map((n) => ({
+      .map((n): Item =>
+        // 키 항목: 열지 않고 바로 값을 복사한다. 꺼내 쓰는 가장 짧은 길 (docs/STRATEGY.md 계획 3)
+        isSecret(n)
+          ? {
+              id: n.id,
+              kind: 'note',
+              label: displayTitle(n),
+              meta: [n.folder, n.secret.env, maskValue(n.secret.value)].filter(Boolean).join(' · '),
+              run: () => copySecret(n.secret.value),
+              alt: () => copySecret(formatEnv([{ name: n.title, value: n.secret.value }]).trimEnd(), ko.keys.copiedPair),
+              open: () => select(n.id),
+            }
+          : {
         id: n.id,
         kind: 'note',
         label: displayTitle(n),
         // 제목이 아니라 본문에서 찾았으면 그 대목을 보여준다
         meta: (needle && !n.title.toLowerCase().includes(needle) && matchSnippet(n.body, needle)) || `${n.folder ?? ko.main.noFolder}, ${relTime(n.updatedAt)}`,
         run: () => select(n.id),
-      }));
+      });
     const all: Item[] = [
       { id: 'new', kind: 'cmd', label: ko.palette.cmd.newNote, key: 'Alt N', run: () => void actions.newNote() },
       { id: 'today', kind: 'cmd', label: ko.palette.cmd.today, key: 'Ctrl D', run: () => void actions.today() },
@@ -64,9 +78,9 @@ export function CommandPalette() {
   }, []);
   useEffect(() => setIdx(0), [q]);
 
-  const run = async (it: Item) => {
+  const run = async (it: Item, how: 'run' | 'alt' | 'open' = 'run') => {
     close();
-    await it.run();
+    await (it[how] ?? it.run)();
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -78,7 +92,7 @@ export function CommandPalette() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const it = items[idx];
-      if (it) void run(it);
+      if (it) void run(it, e.ctrlKey || e.metaKey ? 'open' : e.shiftKey ? 'alt' : 'run');
     } else if (e.key === 'Escape') close();
   };
   const noteCount = items.filter((i) => i.kind === 'note').length;
@@ -119,6 +133,7 @@ export function CommandPalette() {
         <div className="palette-foot">
           <span>{ko.palette.hints.move}</span>
           <span>{ko.palette.hints.open}</span>
+          <span>{ko.palette.hints.pair}</span>
           <span>{ko.palette.hints.close}</span>
         </div>
       </div>

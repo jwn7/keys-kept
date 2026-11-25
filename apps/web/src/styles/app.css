@@ -424,3 +424,51 @@ button.chip:hover { background: var(--line); color: var(--ink); }
   .task-row input { width: 20px; height: 20px; margin-top: 12px; }
   .task-text { padding: 10px 0; font-size: 15px; }
 }
+
+/* ---- 키 장부 (docs/STRATEGY.md) ---- */
+.key-row { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 0; }
+.key-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; border: 0; background: none; text-align: left; padding: 10px 6px 10px 12px; border-radius: var(--radius-m); }
+.key-name { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; min-width: 0; }
+.key-name > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.key-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); min-width: 0; flex-wrap: wrap; }
+.key-mask { font-family: var(--font-mono); }
+.key-chip { display: inline-flex; align-items: center; font-family: var(--font-sans); font-size: 11px; font-weight: 500; border-radius: 999px; padding: 1px 8px; white-space: nowrap; color: var(--ink-2); background: var(--fill); }
+.key-row[aria-current="true"] .key-chip:not(.warn):not(.ok):not(.line) { background: var(--surface); }
+.key-chip.warn { color: var(--accent); background: var(--accent-soft); }
+.key-chip.ok { color: var(--ok, #1F7A50); background: color-mix(in srgb, var(--ok, #1F7A50) 12%, transparent); }
+.key-chip.line { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); font-family: var(--font-mono); }
+.key-copy { flex: none; width: 34px; height: 34px; display: inline-grid; place-items: center; border: 0; border-radius: var(--radius-s); background: transparent; color: var(--muted); font-size: 16px; }
+.key-copy:hover:not(:disabled) { background: var(--line); color: var(--ink); }
+.key-copy:disabled { opacity: .35; }
+.env-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 34px; }
+.env-bar-gap { flex: 1; }
+.editor-title.key-title { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0; }
+.secret-panel { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 8px; }
+.secret-kind { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rotate-link { font-size: 13px; text-underline-offset: 3px; margin-left: 4px; }
+.secret-issues { margin: 0; padding: 10px 14px 10px 30px; border-radius: var(--radius-m); background: var(--accent-soft); color: var(--ink); font-size: 13px; line-height: 1.6; }
+.secret-value { display: flex; align-items: center; gap: 8px; }
+.secret-value input { flex: 1; min-width: 0; height: 44px; border: 0; border-radius: var(--radius-m); background: var(--fill); padding: 0 14px; font-family: var(--font-mono); font-size: 14px; outline: none; }
+.secret-value input:focus { background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong), 0 0 0 4px var(--fill); }
+.secret-value .btn { min-height: 44px; }
+.secret-grid { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 16px; }
+.field-label, .secret-panel .field > label { font-size: 12px; font-weight: 500; color: var(--muted); }
+.secret-env { height: 36px; border: 1px solid var(--line-strong); border-radius: var(--radius-s); background: var(--surface); padding: 0 10px; font-family: var(--font-mono); font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
+.secret-places { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-height: 36px; }
+.secret-places .chip { gap: 2px; padding-right: 2px; }
+.secret-places .chip-add { padding-right: 10px; }
+.env-dialog { max-width: 760px; }
+.env-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.env-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.env-cols textarea.plain { min-height: 260px; font-size: 12px; }
+.env-preview { min-width: 0; }
+.env-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-2); }
+.env-row .key-name { flex: 1; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-warn { color: var(--ink-2); margin: 10px 0 0; }
+@media (max-width: 767px) {
+  .secret-grid, .env-cols, .env-scope { grid-template-columns: 1fr; }
+  .key-copy { width: 44px; height: 44px; }
+  .secret-value { flex-wrap: wrap; }
+  .secret-value input { flex-basis: 100%; height: 48px; }
+  .secret-value .btn { flex: 1; min-height: 48px; }
+}

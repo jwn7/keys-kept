@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { extractTags, type Note } from '@vault/core';
+import { extractTags, envForProject, type Note } from '@vault/core';
+import { copySecret, downloadProjectEnv, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
-import { BackIcon, CalendarIcon, FolderIcon, GearIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
+import { BackIcon, CalendarIcon, FolderIcon, GearIcon, KeyIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
 import { CalendarView, CardGrid, NoteRow, QuickAdd, TodayView } from './NoteViews';
 import { markCapture } from '../app/metrics';
 import { Logo } from '../components/Seal';
@@ -17,12 +18,18 @@ export function useFilteredNotes(): Note[] {
   const filter = useApp((s) => s.filter);
   const sort = useApp((s) => s.sort);
   const query = useApp((s) => s.query);
+  const envFilter = useApp((s) => s.envFilter);
   return useMemo(() => {
     let list: Note[];
     switch (filter.kind) {
       case 'today':
-      case 'all':
         list = notes;
+        break;
+      case 'keys':
+        list = notes.filter((n) => !!n.secret);
+        break;
+      case 'all': // 메모만. 키는 '모든 키'와 프로젝트에서 본다
+        list = notes.filter((n) => !n.secret);
         break;
       case 'dated':
         list = notes.filter((n) => !!n.date);
@@ -37,6 +44,8 @@ export function useFilteredNotes(): Note[] {
         list = trash;
         break;
     }
+    // 환경을 고르면 그 환경의 키와 공통 키만 (메모는 그대로 둔다)
+    if (envFilter) list = list.filter((n) => !n.secret || n.secret.env === null || n.secret.env === envFilter);
     const tokens = searchTokens(query);
     if (tokens.length) list = list.filter((n) => searchScore(n, tokens) > 0);
     // 일정: 가까운 날짜부터
@@ -49,7 +58,7 @@ export function useFilteredNotes(): Note[] {
       return kb.localeCompare(ka);
     };
     return [...list].sort(cmp);
-  }, [notes, trash, filter, sort, query]);
+  }, [notes, trash, filter, sort, query, envFilter]);
 }
 
 /** 새 메모 / 오늘의 메모 / 제목으로 열기 — 팔레트·단축키·링크가 공유 */
@@ -65,6 +74,15 @@ export function useNoteActions() {
       markCapture('new');
       const n = await app.session.save({ title: initial?.title ?? '', body, folder, date: initial?.date ?? null, tags: extractTags(body) });
       if (filter.kind === 'trash') setFilter({ kind: 'all' });
+      select(n.id);
+      return n;
+    },
+    /** 빈 키 항목을 만들어 연다. 프로젝트 화면이면 그 프로젝트에, 환경을 골라 뒀으면 그 환경으로. */
+    async newKey() {
+      const { filter, envFilter } = useApp.getState();
+      markCapture('new');
+      const n = await app.session.save({ title: '', folder: filter.kind === 'folder' ? filter.folder : null, secret: { value: '', env: envFilter, usedIn: [] } });
+      if (filter.kind === 'trash' || filter.kind === 'all' || filter.kind === 'dated' || filter.kind === 'tag') setFilter({ kind: 'keys' });
       select(n.id);
       return n;
     },
@@ -196,6 +214,7 @@ export function MainScreen() {
         <Editor />
       </div>
       {paletteOpen && <CommandPalette />}
+      <EnvImportHost />
     </div>
   );
 }
@@ -214,6 +233,13 @@ function Item({ f, label, count, icon }: { f: Filter; label: string; count?: num
       {count !== undefined && <span className="count">{count}</span>}
     </button>
   );
+}
+
+function EnvImportHost() {
+  const envImport = useApp((s) => s.envImport);
+  const filter = useApp((s) => s.filter);
+  if (!envImport) return null;
+  return <EnvImportDialog initialText={envImport.text} project={filter.kind === 'folder' ? filter.folder : null} onClose={() => useApp.getState().setEnvImport(null)} />;
 }
 
 function Sidebar() {
@@ -253,7 +279,8 @@ function Sidebar() {
         <span>{ko.main.home}</span>
         <span className="count">{ko.time.date(now.getMonth() + 1, now.getDate())}</span>
       </button>
-      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.length} icon={<NotesIcon />} />
+      <Item f={{ kind: 'keys' }} label={ko.main.allKeys} count={notes.filter((n) => n.secret).length || undefined} icon={<KeyIcon />} />
+      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.filter((n) => !n.secret).length} icon={<NotesIcon />} />
       <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} icon={<CalendarIcon />} />
       {folders.named.length > 0 && <div className="label">{ko.main.folders}</div>}
       {folders.named.map(([f, c]) => (
@@ -308,10 +335,22 @@ function NoteList() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
   }, [notes]);
   const title =
-    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : ko.main.allNotes;
+    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : filter.kind === 'keys' ? ko.main.allKeys : ko.main.allNotes;
   const inTrash = filter.kind === 'trash';
   const isToday = filter.kind === 'today';
   const home = isToday || filter.kind === 'all';
+  const envFilter = useApp((s) => s.envFilter);
+  const setEnvFilter = useApp((s) => s.setEnvFilter);
+  const setEnvImport = useApp((s) => s.setEnvImport);
+  // 키를 넣는 화면: 오늘, 모든 키, 프로젝트
+  const keyScreen = isToday || filter.kind === 'keys' || filter.kind === 'folder';
+  const project = filter.kind === 'folder' ? filter.folder : null;
+  const envs = useMemo(() => (filter.kind === 'folder' ? envsOf(notes, project) : []), [notes, filter.kind, project]);
+  const projectHasKeys = filter.kind === 'folder' && notes.some((n) => n.secret && n.folder === project);
+  const copyEnv = async () => {
+    const r = await projectEnvText(notes, project, envFilter);
+    if (r) await copySecret(r.text, ko.keys.copiedEnv(envForProject(notes, { project, env: r.env }).length));
+  };
 
   return (
     <section className="list" aria-label={title}>
@@ -319,14 +358,23 @@ function NoteList() {
         <div className="list-title-row">
           <h1 className="list-title">{title}</h1>
           <button type="button" className="btn btn-sm mobile-only" onClick={() => setScreen('settings')}>{ko.main.settings}</button>
-          <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newNote()} title="Alt+N">
-            <PlusIcon />
-            {ko.main.newNote}
-          </button>
+          {filter.kind !== 'keys' && !inTrash && (
+            <button type="button" className={`btn btn-sm desktop-only${keyScreen ? '' : ' btn-primary'}`} onClick={() => void actions.newNote()} title="Alt+N">
+              <PlusIcon />
+              {ko.main.newNote}
+            </button>
+          )}
+          {keyScreen && (
+            <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newKey()}>
+              <PlusIcon />
+              {ko.main.newKey}
+            </button>
+          )}
         </div>
         {!inTrash && <QuickAdd />}
         <div className="folder-chips">
           <button type="button" aria-pressed={isToday} onClick={() => setFilter({ kind: 'today' })}>{ko.main.home}</button>
+          <button type="button" aria-pressed={filter.kind === 'keys'} onClick={() => setFilter({ kind: 'keys' })}>{ko.main.allKeys}</button>
           <button type="button" aria-pressed={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })}>{ko.main.allNotes}</button>
           <button type="button" aria-pressed={filter.kind === 'dated'} onClick={() => setFilter({ kind: 'dated' })}>{ko.main.dated}</button>
           {folders.map((f) => (
@@ -337,6 +385,22 @@ function NoteList() {
           ))}
           <button type="button" aria-pressed={inTrash} onClick={() => setFilter({ kind: 'trash' })}>{ko.main.trash}</button>
         </div>
+        {keyScreen && (
+          <div className="env-bar">
+            {envs.length > 0 && (
+              <div className="segment" role="group" aria-label={ko.keys.env}>
+                <button type="button" aria-pressed={envFilter === null} onClick={() => setEnvFilter(null)}>{ko.keys.envAll}</button>
+                {envs.map((e) => (
+                  <button key={e} type="button" aria-pressed={envFilter === e} onClick={() => setEnvFilter(e)}>{e}</button>
+                ))}
+              </div>
+            )}
+            <span className="env-bar-gap" />
+            <button type="button" className="btn-link" onClick={() => setEnvImport({ text: '' })}>{ko.keys.importOpen}</button>
+            {projectHasKeys && <button type="button" className="btn-link" onClick={() => void copyEnv()}>{ko.keys.exportCopy}</button>}
+            {projectHasKeys && <button type="button" className="btn-link muted" onClick={() => void downloadProjectEnv(notes, project, envFilter)}>{ko.keys.download}</button>}
+          </div>
+        )}
         {!isToday && <div className="list-head">
           <div className="segment" role="group" aria-label={ko.main.viewLabel}>
             {(['list', 'cards', 'calendar'] as const).map((v) => (
@@ -389,7 +453,7 @@ function NoteList() {
         )}
       </div>
       <div className="fab-bar">
-        <button type="button" className="btn btn-primary fab" onClick={() => void actions.newNote()}>+ {ko.main.newNote}</button>
+        <button type="button" className="btn btn-primary fab" onClick={() => void (keyScreen ? actions.newKey() : actions.newNote())}>+ {keyScreen ? ko.main.newKey : ko.main.newNote}</button>
       </div>
     </section>
   );
