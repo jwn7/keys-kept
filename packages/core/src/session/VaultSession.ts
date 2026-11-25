@@ -52,7 +52,7 @@ export type VaultSessionOptions = {
 };
 
 /** save()에 넘기는 입력. id 없으면 새 메모. */
-export type NoteInput = Partial<Pick<Note, 'id' | 'title' | 'body' | 'tags' | 'folder' | 'pinned'>> & { date?: string | null };
+export type NoteInput = Partial<Pick<Note, 'id' | 'title' | 'body' | 'tags' | 'folder' | 'pinned'>> & { date?: string | null; secret?: Note['secret'] };
 
 export type SessionEvent =
   | { type: 'status'; status: SyncStatus }
@@ -373,6 +373,7 @@ export class VaultSession {
       folder: input.folder !== undefined ? input.folder : (prev?.folder ?? null),
       pinned: input.pinned ?? prev?.pinned ?? false,
       date: input.date !== undefined ? input.date : (prev?.date ?? null),
+      secret: input.secret !== undefined ? input.secret : (prev?.secret ?? null),
       createdAt: prev?.createdAt ?? now,
       updatedAt: now,
       deletedAt: null,
@@ -402,8 +403,8 @@ export class VaultSession {
     let n = 0;
     for (const note of [...this.notes.values()]) {
       if (note.deletedAt === null || new Date(note.deletedAt).getTime() > cutoff) continue;
-      if (note.title === '' && note.body === '' && note.tags.length === 0) continue;
-      await this.persist({ ...note, title: '', body: '', tags: [], folder: null, pinned: false, updatedAt: new Date().toISOString() }, 'delete');
+      if (note.title === '' && note.body === '' && note.tags.length === 0 && !note.secret) continue;
+      await this.persist({ ...note, title: '', body: '', tags: [], folder: null, pinned: false, secret: null, updatedAt: new Date().toISOString() }, 'delete');
       n++;
     }
     if (n) this.emit({ type: 'notes' });
@@ -457,7 +458,7 @@ export class VaultSession {
   async revert(id: string, version: number): Promise<Note> {
     const old = (await this.history(id)).find((h) => h.version === version);
     if (!old) throw new Error(`no version ${version} for ${id}`);
-    return this.save({ id, title: old.note.title, body: old.note.body, tags: old.note.tags, folder: old.note.folder, date: old.note.date ?? null }, { snapshot: true });
+    return this.save({ id, title: old.note.title, body: old.note.body, tags: old.note.tags, folder: old.note.folder, date: old.note.date ?? null, secret: old.note.secret ?? null }, { snapshot: true });
   }
 
   // ---- 동기화 ----

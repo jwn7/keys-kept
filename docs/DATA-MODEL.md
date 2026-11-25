@@ -41,7 +41,9 @@ export type Note = {
   tags: string[];        // 본문 #태그 + 수동
   folder: string | null;
   pinned: boolean;
-  date?: string | null;  // 일정 날짜 YYYY-MM-DD (캘린더 보기). 암호문 안. 이전 메모에는 없음 = null
+  date?: string | null;  // 일정 날짜 YYYY-MM-DD (캘린더 보기). 암호문 안. 이전 메모에는 없음 = null. 키 항목에서는 만료일
+  secret?: { value: string; env: string | null; usedIn: string[] } | null;
+                         // 있으면 키 항목: 제목 = 이름, 폴더 = 프로젝트, 본문 = 설명. 값·환경·쓰이는 곳 모두 암호문 안
   createdAt: string;     // ISO
   updatedAt: string;     // ISO, 충돌 판정 기준
   deletedAt: string | null;

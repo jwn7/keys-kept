@@ -9,9 +9,23 @@ export type Note = {
   pinned: boolean;
   /** 일정 날짜 `YYYY-MM-DD` (캘린더 보기). 암호문 안에 있다. 이전 버전 메모에는 없을 수 있다. */
   date?: string | null;
+  /**
+   * 있으면 이 메모는 키 항목이다 (docs/STRATEGY.md): 제목 = 이름, 폴더 = 프로젝트, date = 만료일, 본문 = 설명.
+   * 값도 암호문 안에 있다. 이전 버전 메모에는 없다.
+   */
+  secret?: SecretInfo | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+};
+
+export type SecretInfo = {
+  /** 키 값 (API 키, 비밀번호, 토큰 …) */
+  value: string;
+  /** 환경 이름(dev, prod …). null이면 모든 환경 공통 */
+  env: string | null;
+  /** 이 값이 들어가 있는 곳: 기기 이름, 배포 서비스 등. 사고가 났을 때 무엇을 바꿀지 고르는 기준 */
+  usedIn: string[];
 };
 
 export type ItemType = 'note' | 'attachment' | 'settings';
