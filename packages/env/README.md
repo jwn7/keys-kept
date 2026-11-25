@@ -67,6 +67,20 @@ node packages/env/bin/vault-scan.mjs src/a.ts    # 파일을 직접 줄 수도 �
 모양으로 추측하는 검사기와 달리 금고의 **실제 값**과 비교하므로, 어떤 서비스의 키든 잡는다. 값은 다시 찍지 않고 파일·줄·키 이름만 알린다. 8자 미만의 값은 보지 않는다.
 `.git/hooks/pre-commit`에서 부르면 커밋을 막는다(비밀번호는 `VAULT_ENV_PASSPHRASE`).
 
+## 7. GitHub Actions 비밀값으로 올리기
+```
+node packages/env/bin/vault-push.mjs github --dry-run                 # 무엇이 올라갈지만 본다
+node packages/env/bin/vault-push.mjs github --repo me/app             # 전부
+node packages/env/bin/vault-push.mjs github --only OPENAI_API_KEY --env production
+```
+우리 서버를 거치지 않는다. 이 기기에서 [GitHub CLI](https://cli.github.com/)(`gh`)의 로그인으로 바로 올리므로 `gh auth login`이 돼 있어야 한다. 값은 명령줄 인자가 아니라 표준 입력으로 넘긴다. GitHub는 올린 값을 다시 보여주지 않으므로, 원본은 계속 금고에 둔다.
+
+## 8. 팀원이 보낸 파일 열기
+팀원이 내 공개키로 잠가 보낸 파일은 비밀번호 대신 내 개인키로 연다(`docs/TEAM.md`).
+```
+VAULT_ENV_IDENTITY_FILE=내개인키.txt  node packages/env/bin/vault-run.mjs --file .env.age -- npm run dev
+```
+
 ## age만으로 풀기
 이 패키지가 없어도 된다.
 ```

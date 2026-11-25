@@ -13,7 +13,8 @@
     "vault-run": "./bin/vault-run.mjs",
     "vault-mcp": "./bin/vault-mcp.mjs",
     "vault-scan": "./bin/vault-scan.mjs",
-    "vault-check": "./bin/vault-check.mjs"
+    "vault-check": "./bin/vault-check.mjs",
+    "vault-push": "./bin/vault-push.mjs"
   },
   "scripts": {
     "test": "vitest run"

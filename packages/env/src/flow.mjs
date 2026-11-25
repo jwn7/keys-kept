@@ -75,3 +75,13 @@ export function findLeaks(text, entries, minLength = 8) {
   }
   return out.sort((a, b) => a.line - b.line);
 }
+
+/** GitHub Actions 비밀값 이름 규칙: 영문·숫자·밑줄, 숫자로 시작 불가, `GITHUB_`로 시작 불가. */
+export function isGithubSecretName(name) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !/^GITHUB_/i.test(name);
+}
+
+/** `gh secret set`에 줄 인자. 값은 여기 없다: 표준 입력으로 넘긴다. */
+export function ghSecretArgs(name, { repo, env } = {}) {
+  return ['secret', 'set', name, ...(repo ? ['--repo', repo] : []), ...(env ? ['--env', env] : [])];
+}

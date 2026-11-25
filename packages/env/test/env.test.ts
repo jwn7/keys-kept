@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -263,4 +263,42 @@ describe('vault-mcp: 검토에서 나온 결함', () => {
     expect(out).not.toContain(SECRET.slice(0, 8));
     expect(out).toContain('[OPENAI'); // 가림 표시는 잘릴 수 있지만 값은 한 글자도 남지 않는다
   }, 30_000);
+});
+
+// @ts-expect-error 순수 JS 모듈이라 타입 선언이 없다
+import { ghSecretArgs, isGithubSecretName } from '../src/flow.mjs';
+
+describe('vault-push github', () => {
+  it('이름 규칙과 인자: 값은 인자에 들어가지 않는다', () => {
+    expect(isGithubSecretName('OPENAI_API_KEY')).toBe(true);
+    expect(isGithubSecretName('GITHUB_TOKEN')).toBe(false);
+    expect(isGithubSecretName('my.key')).toBe(false);
+    expect(ghSecretArgs('A', { repo: 'me/app', env: 'production' })).toEqual(['secret', 'set', 'A', '--repo', 'me/app', '--env', 'production']);
+    expect(ghSecretArgs('A')).toEqual(['secret', 'set', 'A']);
+  });
+
+  it('가짜 gh로: 이름마다 한 번씩 부르고, 값은 표준 입력으로만 넘긴다', () => {
+    // gh 대신 받은 인자와 표준 입력을 파일에 적는 작은 프로그램을 끼운다
+    const log = join(dir, 'gh.log');
+    const fake = join(dir, 'fake-gh.mjs');
+    writeFileSync(fake, `import { appendFileSync, readFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), stdin: readFileSync(0, 'utf8') }) + String.fromCharCode(10));\n`);
+    const wrapper = join(dir, process.platform === 'win32' ? 'gh-fake.cmd' : 'gh-fake');
+    writeFileSync(wrapper, process.platform === 'win32' ? `@"${process.execPath}" "${fake}" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${fake}" "$@"\n`, { mode: 0o755 });
+    const run = (extra: string[]) => spawnSync(process.execPath, [bin('vault-push.mjs'), 'github', '--file', file, '--repo', 'me/app', ...extra], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_GH_BIN: wrapper } });
+
+    const dry = run(['--dry-run']);
+    expect(dry.status).toBe(0);
+    expect(dry.stdout).toContain('OPENAI_API_KEY');
+    expect(dry.stdout).not.toContain(SECRET);
+
+    const r = run(['--only', 'OPENAI_API_KEY,DATABASE_URL']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).not.toContain(SECRET);
+    const calls = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { args: string[]; stdin: string });
+    expect(calls.map((c) => c.args)).toEqual([['secret', 'set', 'OPENAI_API_KEY', '--repo', 'me/app'], ['secret', 'set', 'DATABASE_URL', '--repo', 'me/app']]);
+    expect(calls[0]!.stdin).toBe(SECRET);
+    expect(JSON.stringify(calls.map((c) => c.args))).not.toContain(SECRET);
+
+    expect(run(['--only', 'NOPE']).status).toBe(2);
+  });
 });
