@@ -10,7 +10,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1, // Argon2id가 테스트마다 256MB를 쓴다
-  reporter: [['list']],
+  // CI에서는 실패 메시지를 GitHub 주석으로도 남긴다 (로그를 내려받지 않고 원인을 볼 수 있게)
+  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
   use: { baseURL: 'http://localhost:5173', channel: 'chrome', viewport: { width: 1280, height: 800 }, locale: 'ko-KR' },
   webServer: { command: 'pnpm dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
 });
