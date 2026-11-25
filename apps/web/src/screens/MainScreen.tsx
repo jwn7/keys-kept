@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Note } from '@vault/core';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
-import { backlinkIndex, todayTitle } from '../app/util';
+import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
 import { BackIcon } from '../components/Icons';
 import { CalendarView, CardGrid, NoteRow, QuickAdd } from './NoteViews';
@@ -35,8 +35,8 @@ export function useFilteredNotes(): Note[] {
         list = trash;
         break;
     }
-    const q = query.trim().toLowerCase();
-    if (q) list = list.filter((n) => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q));
+    const tokens = searchTokens(query);
+    if (tokens.length) list = list.filter((n) => searchScore(n, tokens) > 0);
     // 일정: 가까운 날짜부터
     if (filter.kind === 'dated') return [...list].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
     const cmp = (a: Note, b: Note) => {
@@ -125,6 +125,15 @@ export function MainScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, []); // 마운트 시 1회
 
+
+  // 앱 아이콘 바로가기(/?action=new|today): 잠금을 푼 뒤 한 번 실행하고 주소에서 지운다
+  useEffect(() => {
+    const action = new URLSearchParams(window.location.search).get('action');
+    if (action !== 'new' && action !== 'today') return;
+    window.history.replaceState(null, '', window.location.pathname);
+    if (action === 'new') void actions.newNote();
+    else void actions.today();
+  }, []); // 마운트 시 1회
 
   // 모바일 편집 화면의 상단 바: 뒤로 + 상태 + 완료만 (DESIGN.md 모바일 상단 바)
   const mobileEditing = mobileView === 'editor' && !!selectedId;

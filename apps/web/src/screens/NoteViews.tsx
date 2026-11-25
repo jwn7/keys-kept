@@ -21,13 +21,14 @@ export function QuickAdd() {
     const t = text.trim();
     if (!t) return;
     const [first, ...rest] = t.split('\n');
+    // 저장을 기다리기 전에 칸부터 비운다. 저장이 끝난 뒤에 비우면 그 사이에 친 다음 메모가 같이 지워진다.
+    setText('');
     const n = await app.session.save({
       title: first ?? '',
       body: rest.join('\n'),
       date,
       folder: filter.kind === 'folder' ? filter.folder : null,
     });
-    setText('');
     if (app.backendKind !== 'memory') app.scheduler.requestNow();
     if (open) useApp.getState().select(n.id);
     else ui.toast(date ? ko.quick.addedOn(formatDay(date)) : ko.quick.added);

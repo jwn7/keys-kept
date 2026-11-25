@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Note } from '@vault/core';
-import { dayKey, formatDay, monthGrid, noteDay, backlinkIndex, charCount, matchSnippet, passwordScore, relTime, snippet, todayTitle, wikiLinks } from './util';
+import { backupsToDelete } from './autoBackup';
+import { searchNotes, searchScore, dayKey, formatDay, monthGrid, noteDay, backlinkIndex, charCount, matchSnippet, passwordScore, relTime, snippet, todayTitle, wikiLinks } from './util';
 
 const note = (id: string, title: string, body: string): Note => ({
   id, title, body, tags: [], folder: null, pinned: false,
@@ -38,6 +39,37 @@ describe('wikiLinks / backlinkIndex', () => {
     const idx = backlinkIndex([a, b, c]);
     expect(idx.get('a')?.map((n) => n.id)).toEqual(['b']);
     expect(idx.get('c')).toBeUndefined();
+  });
+});
+
+describe('자동 백업 정리', () => {
+  it('이 앱이 만든 이름만, 최근 것 keep개를 남기고 고른다', () => {
+    const names = ['vault-2026-11-01.age', 'vault-2026-11-03.age', '내 문서.txt', 'vault-2026-11-02.age', 'vault-old.age'];
+    expect(backupsToDelete(names, 2)).toEqual(['vault-2026-11-01.age']);
+    expect(backupsToDelete(names, 14)).toEqual([]);
+    expect(backupsToDelete(['메모.age', 'a.txt'], 0)).toEqual([]);
+  });
+});
+
+describe('검색', () => {
+  const a = { ...note('a', '주간 회의', '디자인 검토와 배포 일정'), tags: ['업무'] };
+  const b = { ...note('b', '장보기', '우유 회의용 간식'), folder: '개인' };
+  const c = note('c', '배포 체크리스트', '회의 없이 진행');
+  it('여러 단어는 모두 들어 있어야 한다 (순서 무관, 대소문자 무시)', () => {
+    expect(searchNotes([a, b, c], '회의 배포').map((n) => n.id)).toEqual(['a', 'c']);
+    expect(searchNotes([a, b, c], '없는말')).toEqual([]);
+    expect(searchNotes([{ ...a, title: 'Weekly Sync' }], 'weekly')).toHaveLength(1);
+  });
+  it('제목에서 찾은 메모가 본문에서 찾은 메모보다 먼저', () => {
+    expect(searchNotes([b, a, c], '회의').map((n) => n.id)).toEqual(['a', 'b', 'c']);
+  });
+  it('#태그와 폴더 이름으로도 찾는다', () => {
+    expect(searchNotes([a, b, c], '#업무').map((n) => n.id)).toEqual(['a']);
+    expect(searchNotes([a, b, c], '개인').map((n) => n.id)).toEqual(['b']);
+  });
+  it('빈 검색어는 그대로 돌려준다, searchScore 0은 불일치', () => {
+    expect(searchNotes([a, b], '  ')).toEqual([a, b]);
+    expect(searchScore(a, ['우유'])).toBe(0);
   });
 });
 

@@ -17,3 +17,7 @@ keystore.properties
 *service-account*.json
 google-services.json
 supabase/functions/.env
+
+# Playwright
+test-results/
+playwright-report/

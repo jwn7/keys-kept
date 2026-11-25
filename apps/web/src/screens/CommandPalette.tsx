@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { backupFileName, exportBackup } from '@vault/core';
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
-import { displayTitle, matchSnippet, relTime, shareOrDownload } from '../app/util';
+import { displayTitle, matchSnippet, relTime, searchNotes, shareOrDownload } from '../app/util';
 import { ui } from '../app/ui';
 import { useNoteActions } from './MainScreen';
 
@@ -22,10 +22,7 @@ export function CommandPalette() {
 
   const items = useMemo<Item[]>(() => {
     const needle = q.trim().toLowerCase();
-    const noteItems: Item[] = (needle
-      ? notes.filter((n) => n.title.toLowerCase().includes(needle) || n.body.toLowerCase().includes(needle))
-      : notes
-    )
+    const noteItems: Item[] = searchNotes(notes, needle)
       .slice(0, needle ? 20 : 6)
       .map((n) => ({
         id: n.id,

@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { WrongPasswordError, NotSetUpError, BackupFormatError, BackupPassphraseError, importBackup } from '@vault/core';
 import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
-import { passwordScore, pickFile, relTime } from '../app/util';
+import { pickFile, relTime } from '../app/util';
+import { usePasswordScore } from '../app/strength';
 import { GOOGLE_CLIENT_ID } from '../app/session';
+import { evaluatePasskey } from '../app/passkey';
 import { Logo, Seal } from '../components/Seal';
 
 type Mode = 'password' | 'recovery' | 'restore';
@@ -86,6 +88,26 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passkey, setPasskey] = useState<{ credentialId: string; prfSalt: string } | null>(null);
+  useEffect(() => {
+    void app.session.deviceUnlockInfo().then(setPasskey).catch(() => setPasskey(null));
+  }, [app]);
+
+  // 패스키: 인증기가 준 비밀값으로 이 기기에 둔 감싼 열쇠를 푼다. 실패하면 비밀번호 경로가 그대로 있다.
+  const openWithPasskey = async () => {
+    if (!passkey || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const secret = await evaluatePasskey(passkey.credentialId, passkey.prfSalt);
+      await app.session.unlockWithDeviceSecret(secret);
+      secret.fill(0);
+    } catch {
+      setError(ko.unlock.passkeyFailed);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -114,6 +136,11 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
       <button type="submit" className="btn btn-primary" disabled={!pw || busy} style={{ height: 48 }}>
         {busy ? ko.unlock.deriving : ko.unlock.open}
       </button>
+      {passkey && (
+        <button type="button" className="btn" disabled={busy} style={{ height: 48 }} onClick={() => void openWithPasskey()}>
+          {ko.unlock.passkey}
+        </button>
+      )}
       <label className="switch-row">
         <span>{ko.unlock.autoLock(autoLockMin || 15)}</span>
         <input type="checkbox" role="switch" className="switch" checked={autoLockMin > 0} onChange={(e) => setAutoLock(e.target.checked ? 15 : 0)} />
@@ -146,7 +173,7 @@ function RecoveryCard({ onBack }: { onBack: () => void }) {
       setBusy(false);
     }
   };
-  const score = passwordScore(pw);
+  const score = usePasswordScore(pw);
   return (
     <form className="unlock-card" onSubmit={submit}>
       <div>
@@ -229,7 +256,7 @@ function SetupCard({ onRestore }: { onRestore: () => void }) {
   const [pw2, setPw2] = useState('');
   const [busy, setBusy] = useState(false);
   const [phrase, setPhrase] = useState<string[] | null>(null);
-  const score = passwordScore(pw);
+  const score = usePasswordScore(pw);
   const mismatch = pw2.length > 0 && pw !== pw2;
 
   const submit = async (e: FormEvent) => {
@@ -286,6 +313,7 @@ export function RestoreCard({ firstRun, onBack, onDone }: { firstRun: boolean; o
   const [error, setError] = useState<string | null>(null);
   const [phrase, setPhrase] = useState<string[] | null>(null);
   const needMaster = locked;
+  const masterScore = usePasswordScore(firstRun ? master : '');
 
   const run = async (e: FormEvent) => {
     e.preventDefault();
@@ -335,7 +363,7 @@ export function RestoreCard({ firstRun, onBack, onDone }: { firstRun: boolean; o
       )}
       {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
       {msg && <p className="small" style={{ color: 'var(--ok)' }}>{msg}</p>}
-      <button type="submit" className="btn btn-primary" disabled={!file || !pass || (needMaster && (firstRun ? passwordScore(master) < 3 : !master)) || busy} style={{ height: 48 }}>
+      <button type="submit" className="btn btn-primary" disabled={!file || !pass || (needMaster && (firstRun ? masterScore < 3 : !master)) || busy} style={{ height: 48 }}>
         {busy ? ko.restore.running : ko.restore.run}
       </button>
       <div className="unlock-links">

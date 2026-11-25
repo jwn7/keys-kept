@@ -61,12 +61,53 @@ export function snippet(body: string, max = 80): string {
     .slice(0, max);
 }
 
+/** 검색어를 공백으로 나눈 소문자 조각 */
+export function searchTokens(query: string): string[] {
+  return query.toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * 메모가 조각을 **모두** 포함하면 점수(>0), 아니면 0. 제목 3점, 태그·폴더 2점, 본문 1점.
+ * `#업무`처럼 #으로 시작하면 태그에서만 찾는다. 검색은 기기 안의 복호화된 메모에서만 돈다.
+ */
+export function searchScore(n: Pick<Note, 'title' | 'body' | 'tags' | 'folder'>, tokens: string[]): number {
+  const title = n.title.toLowerCase();
+  const body = n.body.toLowerCase();
+  const tags = n.tags.map((t) => t.toLowerCase());
+  const folder = (n.folder ?? '').toLowerCase();
+  let score = 0;
+  for (const t of tokens) {
+    if (t.startsWith('#') && t.length > 1) {
+      if (!tags.some((x) => x.startsWith(t.slice(1)))) return 0;
+      score += 2;
+      continue;
+    }
+    const s = (title.includes(t) ? 3 : 0) + (tags.some((x) => x.includes(t)) || folder.includes(t) ? 2 : 0) + (body.includes(t) ? 1 : 0);
+    if (s === 0) return 0;
+    score += s;
+  }
+  return score;
+}
+
+/** 점수 높은 순. 같은 점수는 원래 순서(수정순 등)를 지킨다. */
+export function searchNotes<T extends Pick<Note, 'title' | 'body' | 'tags' | 'folder'>>(notes: T[], query: string): T[] {
+  const tokens = searchTokens(query);
+  if (tokens.length === 0) return notes;
+  return notes
+    .map((n, i) => ({ n, i, s: searchScore(n, tokens) }))
+    .filter((x) => x.s > 0)
+    .sort((x, y) => y.s - x.s || x.i - y.i)
+    .map((x) => x.n);
+}
+
 /** 검색어가 본문에서 처음 나오는 곳 앞뒤를 잘라 보여준다. 없으면 빈 문자열. */
 export function matchSnippet(body: string, needle: string, radius = 28): string {
-  const q = needle.trim().toLowerCase();
-  if (!q) return '';
+  // 여러 단어면 본문에 있는 첫 단어 주변을 보여준다
   const flat = body.replace(/\s+/g, ' ');
-  const i = flat.toLowerCase().indexOf(q);
+  const lower = flat.toLowerCase();
+  const q = searchTokens(needle).find((t) => lower.includes(t)) ?? '';
+  if (!q) return '';
+  const i = lower.indexOf(q);
   if (i < 0) return '';
   const from = Math.max(0, i - radius);
   const to = Math.min(flat.length, i + q.length + radius);

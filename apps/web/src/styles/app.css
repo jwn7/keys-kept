@@ -99,6 +99,7 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line-strong); box-sizing: border-box; transition: transform var(--motion); }
 .switch:checked { background: var(--primary); border-color: var(--primary); }
 .switch:checked::after { transform: translateX(18px); border-color: var(--surface); }
+.switch:disabled { opacity: .5; cursor: default; }
 .steps { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .back-btn { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-left: -8px; padding: 0 8px 0 4px; border: 0; background: transparent; font-size: 14px; border-radius: var(--radius-s); }
 .back-btn .icon { font-size: 18px; }

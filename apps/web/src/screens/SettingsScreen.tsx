@@ -5,9 +5,12 @@ import { GisDriveAuth } from '../app/driveAuth';
 import { GOOGLE_CLIENT_ID, setDeviceName } from '../app/session';
 import { proAvailable, proSessionEmail, proSignIn, proSignOut, setProEnabled } from '../pro/supabase';
 import { ko } from '../i18n/ko';
-import { downloadBytes, passwordScore, pickDirectoryFiles, relTime, shareOrDownload } from '../app/util';
+import { downloadBytes, pickDirectoryFiles, relTime, shareOrDownload } from '../app/util';
+import { usePasswordScore } from '../app/strength';
 import { StatusBadge } from '../components/StatusBadge';
 import { ui } from '../app/ui';
+import { createPasskey, passkeySupported } from '../app/passkey';
+import { autoBackupSupported, backupFolder, disableAutoBackup, enableAutoBackup, folderPermission, runAutoBackup } from '../app/autoBackup';
 import { BackIcon } from '../components/Icons';
 import { RestoreCard } from './UnlockScreen';
 
@@ -193,6 +196,40 @@ function BackupSection() {
   const [pass, setPass] = useState('');
   const [busy, setBusy] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  // 자동 백업 폴더: null = 꺼짐. needPerm = 브라우저를 다시 켠 뒤 폴더 권한을 한 번 더 허용해야 하는 상태
+  const [autoDir, setAutoDir] = useState<string | null>(null);
+  const [needPerm, setNeedPerm] = useState(false);
+  const refreshAuto = async () => {
+    const h = await backupFolder();
+    setAutoDir(h?.name ?? null);
+    setNeedPerm(h ? (await folderPermission(h)) !== 'granted' : false);
+  };
+  useEffect(() => {
+    void refreshAuto();
+  }, []);
+  const autoOn = async () => {
+    const p = pass || (await ui.prompt({ title: S.backup.autoPassTitle, body: S.backup.autoPassBody, label: S.backup.passphrase, password: true, confirmLabel: S.backup.autoPick }));
+    if (!p) return;
+    try {
+      await enableAutoBackup(app, p);
+      setPass('');
+      await refreshAuto();
+      await backupNow(true);
+      ui.toast(S.backup.autoSet);
+    } catch {
+      /* 폴더 고르기를 취소함 */
+    }
+  };
+  const backupNow = async (quiet = false) => {
+    const h = await backupFolder();
+    if (h && (await folderPermission(h, true)) !== 'granted') return void refreshAuto();
+    const r = await runAutoBackup(app, { force: true });
+    if (r === 'done') {
+      setLastBackup(new Date().toISOString());
+      if (!quiet) ui.toast(S.backup.autoDone);
+    }
+    await refreshAuto();
+  };
 
   const make = async () => {
     if (!pass || busy) return;
@@ -224,6 +261,24 @@ function BackupSection() {
           <button type="button" className="btn btn-sm" onClick={() => void ui.alert({ title: S.backup.mail, body: S.backup.mailPro })}>{S.backup.mail}</button>
         </div>
       </div>
+      {autoBackupSupported() && (
+        <div className="row">
+          <span className="row-text">
+            {S.backup.auto}
+            {autoDir && <span className="small muted">{S.backup.autoOn(autoDir)}</span>}
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!autoDir ? (
+              <button type="button" className="btn btn-sm" onClick={() => void autoOn()}>{S.backup.autoPick}</button>
+            ) : (
+              <>
+                <button type="button" className="btn btn-sm" onClick={() => void backupNow()}>{needPerm ? S.backup.autoRegrant : S.backup.autoNow}</button>
+                <button type="button" className="btn-link muted" onClick={() => void disableAutoBackup().then(refreshAuto)}>{S.backup.autoOff}</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className="row">
         <span>{S.backup.restore}</span>
         <button type="button" className="btn btn-sm" onClick={() => setRestoreOpen(true)}>{S.backup.restore}</button>
@@ -240,10 +295,39 @@ function BackupSection() {
 }
 
 function SecuritySection() {
+  const app = useApp((s) => s.app);
   const autoLockMin = useApp((s) => s.autoLockMin);
   const setPref = useApp((s) => s.setPref);
   const [pwOpen, setPwOpen] = useState(false);
   const [rkOpen, setRkOpen] = useState(false);
+  const [pkSupported, setPkSupported] = useState<boolean | null>(null);
+  const [pkOn, setPkOn] = useState(false);
+  const [pkBusy, setPkBusy] = useState(false);
+  useEffect(() => {
+    void passkeySupported().then(setPkSupported);
+    void app.session.deviceUnlockInfo().then((i) => setPkOn(!!i));
+  }, [app]);
+  const togglePasskey = async (on: boolean) => {
+    setPkBusy(true);
+    try {
+      if (on) {
+        const { credentialId, prfSalt, secret } = await createPasskey(app.deviceName);
+        await app.session.enableDeviceUnlock(secret, { credentialId, prfSalt });
+        secret.fill(0);
+        setPkOn(true);
+        ui.toast(S.security.passkeyOn);
+      } else {
+        await app.session.disableDeviceUnlock();
+        setPkOn(false);
+        ui.toast(S.security.passkeyOff);
+      }
+    } catch (e) {
+      // 사용자가 창을 닫은 경우(NotAllowedError)는 조용히 둔다
+      if (!(e instanceof DOMException && e.name === 'NotAllowedError')) ui.toast(S.security.passkeyFailed);
+    } finally {
+      setPkBusy(false);
+    }
+  };
   return (
     <section id="security" className="card">
       <h2>{S.nav.security}</h2>
@@ -255,6 +339,13 @@ function SecuritySection() {
           ))}
         </div>
       </div>
+      <label className="row" style={{ cursor: pkSupported ? 'pointer' : 'default' }}>
+        <span className="row-text">
+          {S.security.passkey}
+          {pkSupported === false && <span className="small muted">{S.security.passkeyUnsupported}</span>}
+        </span>
+        <input type="checkbox" role="switch" className="switch" checked={pkOn} disabled={!pkSupported || pkBusy} onChange={(e) => void togglePasskey(e.target.checked)} />
+      </label>
       <div className="row">
         <span>{S.security.changePassword}</span>
         <button type="button" className="btn btn-sm" onClick={() => setPwOpen(true)}>{S.security.change}</button>
@@ -273,6 +364,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const app = useApp((s) => s.app);
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
+  const nextScore = usePasswordScore(next);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -294,12 +386,12 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>{S.security.changePassword}</h2>
         <div className="field"><label htmlFor="cur">{S.security.current}</label><div className="input-wrap"><input id="cur" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoFocus /></div></div>
-        <div className="field"><label htmlFor="nxt">{S.security.next}</label><div className="input-wrap"><input id="nxt" type="password" value={next} onChange={(e) => setNext(e.target.value)} /></div><span className="hint">{ko.setup.strength[passwordScore(next)]}</span></div>
+        <div className="field"><label htmlFor="nxt">{S.security.next}</label><div className="input-wrap"><input id="nxt" type="password" value={next} onChange={(e) => setNext(e.target.value)} /></div><span className="hint">{ko.setup.strength[nextScore]}{next && nextScore < 3 ? ` ${ko.setup.tooWeak}` : ''}</span></div>
         {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
         {msg && <p className="small" style={{ color: 'var(--ok)' }}>{msg}</p>}
         <div className="actions">
           <button type="button" className="btn btn-sm" onClick={onClose}>{ko.common.close}</button>
-          {!msg && <button type="submit" className="btn btn-primary btn-sm" disabled={!cur || passwordScore(next) < 3 || busy}>{S.security.change}</button>}
+          {!msg && <button type="submit" className="btn btn-primary btn-sm" disabled={!cur || nextScore < 3 || busy}>{S.security.change}</button>}
         </div>
       </form>
     </div>
