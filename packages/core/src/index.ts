@@ -32,6 +32,8 @@ export { isSecret, planEnvImport, envForProject, envMatrix, secretIssues, places
 export type { SecretIssue, EnvMatrix, MatrixCell } from './secrets/ledger';
 export { newShareIdentity, recipientOf, recipientFingerprint, isShareRecipient, isShareIdentity, sealEnvFor, openEnvWith } from './secrets/share';
 export type { ShareIdentity } from './secrets/share';
+export { FolderBackend, MemoryFolderFs } from './sync/folder/FolderBackend';
+export type { FolderFs } from './sync/folder/FolderBackend';
 export { generateSecret } from './secrets/generate';
 export type { GenerateKind } from './secrets/generate';
 export { sealEnv, openEnv, envAgeFileName, EnvPassphraseError } from './secrets/envage';

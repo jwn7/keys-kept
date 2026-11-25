@@ -14,7 +14,7 @@ export type MetaMap = {
   lastFullCheckAt: string;
   deviceId: string;
   deviceName: string;
-  backend: 'memory' | 'drive' | 'supabase';
+  backend: 'memory' | 'drive' | 'supabase' | 'folder';
   itemsKeyRecord: ItemsKeyRecord;
   /** 패스키(지문·Windows Hello)로 여는 데 쓰는, 이 기기 전용 감싼 열쇠. 서버로 가지 않는다. */
   deviceUnlock: DeviceUnlockRecord;

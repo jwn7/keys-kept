@@ -2,12 +2,12 @@ import type { EncryptedItem, ItemsKeyRecord } from '../model/types';
 
 /**
  * 동기화 백엔드 인터페이스.
- * 구현체: MemoryBackend(테스트), DriveBackend(기본, 무료), SupabaseBackend(Pro).
+ * 구현체: MemoryBackend(테스트), DriveBackend(기본, 무료), FolderBackend(폴더 하나, 다른 동기화 도구와 같이), SupabaseBackend(Pro).
  * 이 경계를 지나는 모든 것은 이미 암호문이다. 평문 Note는 여기 오지 않는다.
  */
 export interface SyncBackend {
   /** 백엔드 식별자. 상태 뱃지와 설정 화면에서 표시 */
-  readonly kind: 'memory' | 'drive' | 'supabase';
+  readonly kind: 'memory' | 'drive' | 'supabase' | 'folder';
 
   /** 연결 상태 확인 (토큰 유효성 등). 실패 시 throw */
   ping(): Promise<void>;
