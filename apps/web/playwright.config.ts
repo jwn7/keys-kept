@@ -13,5 +13,12 @@ export default defineConfig({
   // CI에서는 실패 메시지를 GitHub 주석으로도 남긴다 (로그를 내려받지 않고 원인을 볼 수 있게)
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
   use: { baseURL: 'http://localhost:5173', channel: 'chrome', viewport: { width: 1280, height: 800 }, locale: 'ko-KR' },
-  webServer: { command: 'pnpm dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
+  // Drive 연결 버튼은 클라이언트 ID가 있어야 켜진다. CI에는 .env가 없으므로 테스트용 값을 준다(가짜 Drive만 부른다).
+  webServer: {
+    command: 'pnpm dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: true,
+    timeout: 60_000,
+    env: { VITE_GOOGLE_CLIENT_ID: process.env.VITE_GOOGLE_CLIENT_ID ?? 'e2e-client-id' },
+  },
 });
