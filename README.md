@@ -1,57 +1,78 @@
-# Vault (가칭)
+# Vault
 
-1인 개발자와 바이브코더를 위한 **키 장부**. API 키, 환경변수, 계정 정보를 메모장에 적어 두는 대신 기기에서 잠가 보관하고, 어디에 쓰이는지·언제 끝나는지·털리면 뭘 바꿔야 하는지를 같이 관리한다.
+A key ledger for solo developers. Keep API keys, environment variables, and account details in one encrypted place, and know **where each key is used, when it expires, and what to rotate when something leaks**.
 
-- 키를 붙여 넣으면 어느 서비스의 무슨 키인지 알아보고, 브라우저에 공개되는 이름(`NEXT_PUBLIC_`, `VITE_`)에 비밀 키를 넣으면 경고한다.
-- 꺼내 쓰기: `Ctrl+K` → 이름 → Enter로 복사. `.env` 통째로 넣고 꺼내기.
-- 평문 `.env` 없이 실행: `vault-run -- npm run dev` (`packages/env`).
-- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버, `packages/env`).
-- 사고 모드: 털린 기기나 프로젝트를 고르면 바꿔야 할 키 체크리스트가 나온다.
-- 기기에서 암호화(Argon2id + XChaCha20-Poly1305), 회사 서버 없이 내 Google Drive에 암호문만, 백업은 표준 age 파일.
+[한국어 README](README.ko.md)
 
-> **외부 보안 검토를 받지 않았다.** 잃거나 새도 다시 발급할 수 있는 키만 넣을 것. 한계는 `docs/SECURITY.md`.
+> **Not externally reviewed.** Use it for keys you can rotate, and keep a backup. See [SECURITY.md](SECURITY.md) for the limits.
 
-## 이 저장소의 상태
-키 장부의 계획 1~6단계 완료(core 136, web 35, env 7, 화면 흐름 17). 남은 것은 외부 작업(OAuth 등록, Android 빌드, 스토어 등록)과 다국어. 문서는 다음 순서로 읽는다.
+## Why another secrets tool
+Password managers and team secret managers answer "where do I store this safely". The gap is what happens after: your laptop catches malware, or a key lands in a public repo, and you have to work out which keys were on that machine and where else they live.
 
-0. `docs/STRATEGY.md` — 무엇을 만드는가, 계획, 보류한 것 (방향은 이 문서가 정한다)
-1. `CLAUDE.md` — 작업 규칙 (먼저 읽기)
-2. `docs/SPEC.md` — 제품 스펙
-3. `docs/DATA-MODEL.md` — 키 계층·타입·백엔드 파일/테이블 구조
-4. `docs/ARCHITECTURE.md` — 층·흐름·테스트 전략
-5. `docs/ROADMAP.md` — 단계별 체크리스트 (0단계부터)
-6. `docs/WIREFRAMES.md` — 화면 설명 + 캔버스 링크
-7. `docs/DESIGN.md` — 디자인 토큰·컴포넌트 규칙 (UI 구현 전 읽기)
-8. `packages/core/src/` — 타입과 `SyncBackend` 인터페이스, crypto 구현 가이드
-9. `supabase/migrations/0001_init.sql` — Pro 백엔드 스키마 (6단계에서 적용)
+- **It recognises keys.** Paste one and it tells you the provider, whether it is a live key, and whether it is safe to ship to a browser.
+- **It catches the common mistake.** A secret key under a browser-exposed name (`NEXT_PUBLIC_`, `VITE_`, …) is flagged before you deploy it.
+- **It keeps a ledger.** Each key records the project, environment, machines and services it is used in, and its expiry.
+- **Incident mode.** Pick the device, service, or project that leaked and get the list of keys to rotate, with a link to each provider's rotation page.
+- **Environment comparison.** Keys as rows, environments as columns. The value that exists in dev but not in prod is the one that takes production down.
+- **AI tools get names, not values.** An MCP server lets a coding assistant run commands with your keys injected. The values never enter the conversation, and output is redacted.
+- **No company server.** Ciphertext syncs to your own Google Drive or a folder you choose. If this project disappears, your data still opens.
 
-## 시작하기
+## What it looks like in use
+```bash
+# Paste a .env into the app, then export it encrypted (a standard age file).
+# Run without a plaintext .env on disk:
+node packages/env/bin/vault-run.mjs -- npm run dev
+
+# Fail fast if the vault is missing something the code needs:
+node packages/env/bin/vault-check.mjs            # compares with .env.example
+
+# Block a commit that contains one of your actual key values:
+node packages/env/bin/vault-scan.mjs
+
+# Push to GitHub Actions secrets through your own gh login:
+node packages/env/bin/vault-push.mjs github --repo me/app --dry-run
+```
+In the app, `Ctrl K`, a few letters of the key name, and `Enter` copies the value. `Shift Enter` copies `NAME=value`.
+
+Details: [packages/env/README.md](packages/env/README.md) (run wrapper, loader, MCP server, branch-to-environment mapping), [docs/TEAM.md](docs/TEAM.md) (sharing a project with teammates by public key).
+
+## Getting started
 ```bash
 pnpm i
-pnpm -r test            # core + web + env
+pnpm -r test            # core, web, env
 pnpm --filter web dev   # http://localhost:5173
 ```
-- 처음 실행하면 마스터 비밀번호를 정하고 복구 키 12단어를 받는다. 기본은 **로컬 전용**(IndexedDB에 암호문만).
-- Google Drive 동기화: `apps/web/.env`에 `VITE_GOOGLE_CLIENT_ID` (Cloud Console, 웹 클라이언트, `drive.file`) → 설정 > 동기화 > Google Drive 연결.
-- Pro(Supabase): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` + `supabase db push` + Auth Google provider → 설정 > 업그레이드. `supabase functions deploy backup-mail`로 메일 백업.
-- 백업: 설정 > 백업 > 파일로 내려받기 → `vault-YYYY-MM-DD.age`. `age -d vault-YYYY-MM-DD.age > notes.json` 으로 앱 없이 복호화.
-- 모바일: PWA로 설치(브라우저 메뉴 > 홈 화면에 추가). Tauri 네이티브는 `docs/MOBILE.md`.
+On first run you choose a master password and receive a 12-word recovery phrase. By default everything stays on the device (ciphertext in IndexedDB).
 
-## 기술 스택
-| 층 | 선택 |
+- **Google Drive sync:** set `VITE_GOOGLE_CLIENT_ID` in `apps/web/.env` (a web OAuth client with the `drive.file` scope), then Settings → Sync.
+- **Backup:** Settings → Backup produces `vault-YYYY-MM-DD.age`. `age -d` opens it without this app.
+- **Language:** Korean and English. Settings → Appearance.
+
+## How it protects your keys
+| | |
 |---|---|
-| UI | React 19 + Vite + TypeScript, PWA → Tauri 2 (데스크톱·모바일) |
-| 암호화 | libsodium-wrappers-sumo (Argon2id, XChaCha20-Poly1305), age-encryption (백업) |
-| 로컬 저장 | Dexie (IndexedDB) → Tauri SQLite |
-| 동기화 | Google Drive API (`drive.file`) 기본 / Supabase (Pro) |
-| 편집기 | CodeMirror 6 (마크다운, `/` 명령, `[[` 자동완성) |
-| 상태 | Zustand |
-| 테스트 | Vitest, Playwright |
-| 패키지 | pnpm workspace |
+| Password to key | Argon2id (libsodium `crypto_pwhash`) |
+| Items | XChaCha20-Poly1305, padded so sizes do not reveal length |
+| Sync | Only ciphertext leaves the device. Conflicts keep both versions. A device will not accept an older version than it already holds. |
+| Backups and shared files | Standard [age](https://age-encryption.org) format. Team sharing uses post-quantum hybrid recipients. |
+| Web app | Content Security Policy blocks external scripts and unknown hosts. No external requests at startup. |
 
-## 위협 모델
-막는 것: Drive/Supabase 유출, 내부자, 메일함 유출, 분실한 잠긴 기기, 네트워크 도청.
-못 막는 것: 잠금 해제된 기기의 악성코드, 약한 비밀번호, 메타데이터(메모 수·크기·수정 시각), 사용자가 평문으로 내보낸 파일.
+No cryptographic primitives are implemented in this repository. The threat model, each defence, and the limits are written up in [docs/SECURITY.md](docs/SECURITY.md) (Korean) and summarised in [SECURITY.md](SECURITY.md).
 
-## 라이선스
-MIT. [LICENSE](LICENSE) 참고.
+## Repository layout
+```
+packages/core   encryption, local store, sync engine, backup, key ledger logic (no UI; runs in browser and Node)
+packages/env    Node helpers: vault-run, vault-check, vault-scan, vault-push, MCP server (plain JS, no build step)
+apps/web        React + Vite PWA
+supabase/       optional hosted backend
+docs/           spec, data model, design, strategy, security, team sharing (mostly Korean)
+```
+Start with [docs/STRATEGY.md](docs/STRATEGY.md) for what this is and what is planned, and [CLAUDE.md](CLAUDE.md) for the working rules of the codebase.
+
+## Status
+Working: the ledger, key recognition, `.env` import and export, environment comparison, incident mode, the Node helpers, the MCP server, file-based team sharing, Drive and folder backends.
+
+Not done: an external security review, a packaged desktop or mobile build, live shared projects for teams, OS keychain integration for the Node helpers.
+
+## License
+MIT. See [LICENSE](LICENSE).
