@@ -24,12 +24,14 @@ export { VaultSession, LockedError, VaultMismatchError, WrongPasswordError, NotS
 export type { VaultSessionOptions, NoteInput, SessionEvent } from './session/VaultSession';
 export type { SecretInfo } from './model/types';
 export type { DeviceUnlockRecord } from './store/LocalStore';
-export { detectKey, isPublicEnvName, publicNameWarning } from './secrets/detect';
+export { detectKey, defaultKeyName, isPublicEnvName, publicNameWarning } from './secrets/detect';
 export type { KeyDetection, KeyExposure, KeyMode } from './secrets/detect';
-export { parseEnv, formatEnv } from './secrets/envfile';
+export { parseEnv, formatEnv, isEnvName } from './secrets/envfile';
 export type { EnvEntry } from './secrets/envfile';
 export { isSecret, planEnvImport, envForProject, envMatrix, secretIssues, placesUsed, compromisedBy, maskValue } from './secrets/ledger';
 export type { SecretIssue, EnvMatrix, MatrixCell } from './secrets/ledger';
+export { newShareIdentity, recipientOf, recipientFingerprint, isShareRecipient, isShareIdentity, sealEnvFor, openEnvWith } from './secrets/share';
+export type { ShareIdentity } from './secrets/share';
 export { generateSecret } from './secrets/generate';
 export type { GenerateKind } from './secrets/generate';
 export { sealEnv, openEnv, envAgeFileName, EnvPassphraseError } from './secrets/envage';

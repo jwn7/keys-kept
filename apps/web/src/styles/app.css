@@ -509,3 +509,15 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 
 /* 제목 줄: 단추가 여럿일 때 제목만 왼쪽, 단추들은 오른쪽에 모은다 */
 .list-title-row .list-title { margin-right: auto; }
+
+/* ---- 팀 공유 ---- */
+.share-dialog { max-width: 620px; }
+.share-block { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--radius-m); background: var(--surface-2); }
+.share-key { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; word-break: break-all; max-height: 4.5em; overflow: auto; color: var(--ink-2); }
+.share-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.share-print { font-family: var(--font-mono); font-size: 12px; }
+.share-person { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 14px; }
+.share-person input { width: 16px; height: 16px; accent-color: var(--primary); }
+.share-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-add { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+@media (max-width: 767px) { .share-add { grid-template-columns: 1fr; } }

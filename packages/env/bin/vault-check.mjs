@@ -3,7 +3,7 @@
 // 저장소의 .env.example이 요구하는 이름이 금고에 다 있는지 본다. 빠진 것이 있으면 이름을 알리고 1로 끝난다.
 // 실행하거나 배포하기 전에 돌리면 "변수 하나 빠져서 죽는" 일을 미리 잡는다.
 import { existsSync, readFileSync } from 'node:fs';
-import { getPassphrase, readEnvAge } from '../src/index.mjs';
+import { readEnv } from '../src/index.mjs';
 import { missingNames, resolveEnvFile } from '../src/flow.mjs';
 
 const argv = process.argv.slice(2);
@@ -17,7 +17,7 @@ if (!existsSync(example)) {
 }
 let entries;
 try {
-  entries = await readEnvAge(file, await getPassphrase(file));
+  entries = await readEnv(file);
 } catch (e) {
   console.error(`vault-check: ${e instanceof Error ? e.message : e}`);
   process.exit(2);

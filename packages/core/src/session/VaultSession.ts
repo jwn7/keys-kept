@@ -90,6 +90,13 @@ export class VaultSession {
   private notes = new Map<string, Note>();
   private versions = new Map<string, number>();
   private listeners = new Set<(e: SessionEvent) => void>();
+  /** 저장을 한 줄로 세운다. 겹쳐 들어온 저장이 서로의 이전 상태를 읽고 상대가 바꾼 칸을 지우지 않게 한다. */
+  private writes: Promise<unknown> = Promise.resolve();
+  private serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.writes.then(fn, fn);
+    this.writes = run.catch(() => undefined);
+    return run;
+  }
   /** 이번 잠금 해제 동안 백엔드의 열쇠 레코드를 확인했는지 (sync마다 Drive를 한 번 더 읽지 않게) */
   private remoteKeysChecked = false;
   /** 엔진 밖에서 난 동기화 오류(볼트 불일치). 엔진이 다음 상태를 알리면 지운다. */
@@ -361,6 +368,11 @@ export class VaultSession {
    * `snapshot: true`면 버전 기록에 반드시 새 칸을 만든다 (되돌리기처럼 직전 상태를 잃으면 안 되는 저장).
    */
   async save(input: NoteInput, opts: { snapshot?: boolean } = {}): Promise<Note> {
+    this.requireUnlocked(); // 잠겨 있으면 줄을 서기 전에 바로 알린다
+    return this.serial(() => this.saveNow(input, opts));
+  }
+
+  private async saveNow(input: NoteInput, opts: { snapshot?: boolean }): Promise<Note> {
     this.requireUnlocked();
     const now = new Date().toISOString();
     const prev = input.id ? this.notes.get(input.id) : undefined;
@@ -385,6 +397,11 @@ export class VaultSession {
 
   /** tombstone: deletedAt 설정 후 저장. 물리 삭제는 계정 삭제 흐름에서만. */
   async delete(id: string): Promise<void> {
+    this.requireUnlocked();
+    return this.serial(() => this.deleteNow(id));
+  }
+
+  private async deleteNow(id: string): Promise<void> {
     this.requireUnlocked();
     const prev = this.notes.get(id);
     if (!prev || prev.deletedAt !== null) return;

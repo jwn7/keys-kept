@@ -61,6 +61,9 @@ const RULES: Rule[] = [
   { re: /^hf_[A-Za-z0-9]{30,}$/, provider: 'Hugging Face', kind: 'access token', rotateUrl: URL.huggingface },
   { re: /^re_\w{20,}$/, provider: 'Resend', kind: 'API key', rotateUrl: URL.resend },
   { re: /^SG\.[\w-]{16,}\.[\w-]{16,}$/, provider: 'SendGrid', kind: 'API key', rotateUrl: URL.sendgrid },
+  // 이 앱의 팀 공유 열쇠 (secrets/share.ts). 개인키는 비밀, 공개키는 남에게 줘도 된다.
+  { re: /^AGE-SECRET-KEY-(?:PQ-)?1[A-Z0-9]{20,}$/, provider: 'age', kind: 'identity' },
+  { re: /^age1[a-z0-9]{20,}$/, provider: 'age', kind: 'public key', exposure: 'public' },
   { re: /^-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----$/, provider: 'Private key', kind: 'PEM' },
 ];
 
@@ -98,6 +101,11 @@ export function detectKey(input: string): KeyDetection | null {
     return { provider: 'JWT', kind: 'token', exposure: 'secret', mode: null, rotateUrl: null };
   }
   return null;
+}
+
+/** 이름 없이 값만 넣은 키에 붙일 이름. 환경변수로 쓸 수 있는 꼴이어야 내보낼 때 빠지지 않는다 (예: OPENAI_API_KEY). */
+export function defaultKeyName(d: KeyDetection): string {
+  return `${d.provider}_${d.kind}`.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
 /** 빌드 도구가 브라우저 코드에 그대로 넣는 환경변수 이름의 접두어. */

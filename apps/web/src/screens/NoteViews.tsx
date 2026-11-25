@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { detectKey, isConflictCopy, isSecret, parseEnv, secretIssues, type Note } from '@vault/core';
+import { defaultKeyName, detectKey, isConflictCopy, isSecret, parseEnv, secretIssues, type Note } from '@vault/core';
 import { KeyRow } from './KeyViews';
 import { flushEditor, useApp } from '../app/store';
 import { checkTask, openTasks, parseQuickDate, reviewDue, type Task } from '../app/assist';
@@ -38,7 +38,7 @@ export function QuickAdd() {
       setNoDate(false);
       markCapture('quick');
       const k = await app.session.save({
-        title: pair ? pair.name : `${bare!.provider} ${bare!.kind}`,
+        title: pair ? pair.name : defaultKeyName(bare!), // 환경변수로 쓸 수 있는 이름이어야 내보낼 때 빠지지 않는다
         folder: filter.kind === 'folder' ? filter.folder : null,
         secret: { value: pair ? pair.value : t, env: useApp.getState().envFilter, usedIn: [] },
       });

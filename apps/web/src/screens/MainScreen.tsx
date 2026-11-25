@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { extractTags, envForProject, type Note } from '@vault/core';
-import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
+import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, ShareDialog, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
@@ -356,6 +356,7 @@ function NoteList() {
   const project = filter.kind === 'folder' ? filter.folder : null;
   const envs = useMemo(() => (filter.kind === 'folder' ? envsOf(notes, project) : []), [notes, filter.kind, project]);
   const projectHasKeys = filter.kind === 'folder' && notes.some((n) => n.secret && n.folder === project);
+  const [sharing, setSharing] = useState(false);
   const copyEnv = async () => {
     const r = await projectEnvText(notes, project, envFilter);
     if (r) await copySecret(r.text, ko.keys.copiedEnv(envForProject(notes, { project, env: r.env }).length));
@@ -411,6 +412,7 @@ function NoteList() {
             <button type="button" className="btn-link" onClick={() => setEnvImport({ text: '' })}>{ko.keys.importOpen}</button>
             {projectHasKeys && <button type="button" className="btn-link" onClick={() => void copyEnv()}>{ko.keys.exportCopy}</button>}
             {projectHasKeys && <button type="button" className="btn-link" onClick={() => void downloadSealedEnv(notes, project, envFilter)}>{ko.keys.sealed}</button>}
+            {projectHasKeys && <button type="button" className="btn-link" onClick={() => setSharing(true)}>{ko.keys.share.open}</button>}
             {projectHasKeys && <button type="button" className="btn-link muted" onClick={() => void downloadProjectEnv(notes, project, envFilter)}>{ko.keys.download}</button>}
           </div>
         )}
@@ -469,6 +471,7 @@ function NoteList() {
           list.map((n) => <NoteRow key={n.id} n={n} now={now} />)
         )}
       </div>
+      {sharing && <ShareDialog project={project} env={envFilter} onClose={() => setSharing(false)} />}
       <div className="fab-bar">
         <button type="button" className="btn btn-primary fab" onClick={() => void (keyScreen ? actions.newKey() : actions.newNote())}>+ {keyScreen ? ko.main.newKey : ko.main.newNote}</button>
       </div>

@@ -1,7 +1,7 @@
 import type { Note, SecretInfo } from '../model/types';
 import type { NoteInput } from '../session/VaultSession';
 import { detectKey, publicNameWarning } from './detect';
-import type { EnvEntry } from './envfile';
+import { isEnvName, type EnvEntry } from './envfile';
 
 /**
  * 키 장부 (docs/STRATEGY.md 계획 2, 6).
@@ -15,6 +15,8 @@ export function isSecret<T extends Pick<Note, 'secret'>>(n: T): n is T & { secre
   return !!n.secret;
 }
 const live = (n: Note): n is SecretNote => n.deletedAt === null && isSecret(n);
+/** 같은 이름이 겹쳤을 때는 가장 최근에 고친 것을 쓴다. 넣기·꺼내기·비교표가 같은 것을 봐야 한다. */
+const newer = (a: SecretNote | undefined | null, b: SecretNote): SecretNote => (a && a.updatedAt >= b.updatedAt ? a : b);
 
 type Scope = { project: string | null; env: string | null };
 
@@ -25,10 +27,12 @@ type Scope = { project: string | null; env: string | null };
 export function planEnvImport(existing: Note[], entries: EnvEntry[], scope: Scope): { create: NoteInput[]; update: NoteInput[]; unchanged: number } {
   const byName = new Map<string, SecretNote>();
   for (const n of existing) {
-    if (live(n) && n.folder === scope.project && n.secret.env === scope.env) byName.set(n.title, n);
+    if (live(n) && n.folder === scope.project && n.secret.env === scope.env) byName.set(n.title, newer(byName.get(n.title), n));
   }
   const plan = { create: [] as NoteInput[], update: [] as NoteInput[], unchanged: 0 };
-  for (const { name, value } of entries) {
+  // 붙여 넣은 글에 같은 이름이 두 번 있으면 마지막 것만 (.env를 읽는 프로그램들도 그렇게 한다)
+  const last = new Map(entries.map((e) => [e.name, e.value]));
+  for (const [name, value] of last) {
     const found = byName.get(name);
     if (!found) plan.create.push({ title: name, folder: scope.project, secret: { value, env: scope.env, usedIn: [] } });
     else if (found.secret.value === value) plan.unchanged++;
@@ -42,15 +46,18 @@ export function planEnvImport(existing: Note[], entries: EnvEntry[], scope: Scop
  * 환경을 안 정한 값(env: null)은 모든 환경 공통이고, 고른 환경에 같은 이름이 있으면 그쪽이 우선한다.
  */
 export function envForProject(notes: Note[], scope: Scope): EnvEntry[] {
-  const picked = new Map<string, { value: string; specific: boolean }>();
+  const picked = new Map<string, { note: SecretNote; specific: boolean }>();
   for (const n of notes) {
     if (!live(n) || n.folder !== scope.project) continue;
+    // 환경변수 이름이 아닌 것(빈 이름, 띄어쓰기, 충돌 사본)은 넣지 않는다: 넣어도 받는 쪽이 그 줄을 버린다
+    if (!isEnvName(n.title)) continue;
     const specific = n.secret.env !== null;
     if (specific && n.secret.env !== scope.env) continue;
     const prev = picked.get(n.title);
-    if (!prev || (specific && !prev.specific)) picked.set(n.title, { value: n.secret.value, specific });
+    if (!prev || (specific && !prev.specific)) picked.set(n.title, { note: n, specific });
+    else if (specific === prev.specific) picked.set(n.title, { note: newer(prev.note, n), specific });
   }
-  return [...picked.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, v]) => ({ name, value: v.value }));
+  return [...picked.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, v]) => ({ name, value: v.note.secret.value }));
 }
 
 export type MatrixCell = { note: SecretNote; /** own: 그 환경의 값, shared: 공통 값을 물려받음 */ state: 'own' | 'shared' };
@@ -71,10 +78,11 @@ export function envMatrix(notes: Note[], project: string | null): EnvMatrix {
   const names = [...new Set(mine.map((n) => n.title))].sort();
   const missing: EnvMatrix['missing'] = [];
   const rows = names.map((name) => {
-    const shared = mine.find((n) => n.title === name && n.secret.env === null) ?? null;
+    const pick = (env: string | null) => mine.filter((n) => n.title === name && n.secret.env === env).reduce<SecretNote | null>((a, b) => newer(a, b), null);
+    const shared = pick(null);
     const cells: Record<string, MatrixCell | null> = {};
     for (const env of envs) {
-      const own = mine.find((n) => n.title === name && n.secret.env === env);
+      const own = pick(env);
       cells[env] = own ? { note: own, state: 'own' } : shared ? { note: shared, state: 'shared' } : null;
       if (!cells[env]) missing.push({ name, env });
     }

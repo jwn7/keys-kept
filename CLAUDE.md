@@ -4,7 +4,7 @@
 PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세 스펙은 `docs/`에 있다 — **코드를 쓰기 전에 `docs/SPEC.md`와 `docs/DATA-MODEL.md`를 읽는다.**
 
 ## 현재 상태
-- 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 142개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
+- 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 156개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
 - 왜 쓰는가·KPI·자동으로 도와주는 것: `docs/KPI.md` (오늘 화면, 할 일 모음, 날짜 말, 관련 메모, 복습은 `apps/web/src/app/assist.ts`의 순수 함수)
 - **방향과 계획은 `docs/STRATEGY.md` 하나가 정한다** (다른 문서와 다르면 그 문서가 맞다). 이 앱은 1인 개발자·바이브코더를 위한 **키 장부**(API 키·환경변수·계정 정보)다. 지금 하는 일은 그 문서의 계획 순서. 계획에 없는 기능은 끼워 넣지 않고, 넣으려면 그 문서부터 고친다
 - 공격별 대응과 제안 중인 방어: `docs/SECURITY.md` (배포 빌드에는 CSP가 있다. 새 외부 주소에 연결하려면 `apps/web/vite.config.ts`의 허용 목록에 이유와 함께 추가)
@@ -19,7 +19,7 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 4. 동기화 백엔드는 `SyncBackend` 인터페이스(`packages/core/src/sync/SyncBackend.ts`)로만 접근한다. Google Drive가 기본, Supabase는 Pro 옵션. UI는 어느 백엔드인지 몰라야 한다.
 5. 삭제는 tombstone(`deletedAt`)이다. 물리 삭제는 "계정 삭제" 흐름에서만.
 6. 충돌은 LWW(`updatedAt` 큰 쪽 채택) + 진 쪽을 "충돌 사본" 메모로 보존한다. 데이터를 조용히 버리지 않는다.
-7. 백업 파일은 **age 포맷**(`age-encryption` 패키지, 패스프레이즈 모드)이다. 자체 포맷을 만들지 않는다. `age -d`로 풀리는지가 테스트 기준.
+7. 백업 파일은 **age 포맷**(`age-encryption` 패키지, 패스프레이즈 모드)이다. 팀원에게 보내는 파일도 age 포맷이고 수신자(공개키) 모드를 쓴다(`docs/TEAM.md`). 자체 포맷을 만들지 않는다. `age -d`로 풀리는지가 테스트 기준.
 8. 런타임 의존성은 최소로: `libsodium-wrappers-sumo`, `age-encryption`, `dexie`, `@supabase/supabase-js`(Pro 모듈에서만), React. 새 런타임 의존성은 이유를 적고 추가한다.
    - `@zxcvbn-ts/*`(apps/web): 약한 비밀번호가 위협 모델의 가장 큰 약점이라 추가. 비밀번호를 정하는 화면에서만 지연 로딩, 계산은 기기 안.
    - `@fontsource/*`(빌드 자산): 외부 글꼴 서버 요청을 없애려고 글꼴을 번들에 넣음.
@@ -40,7 +40,7 @@ docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
 ## 명령
 - `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
 - `pnpm --filter web dev` (localhost:5173)
-- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 18개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
+- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 20개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
 - `node apps/web/scripts/csp-check.mjs` (배포 빌드의 CSP 점검, `pnpm --filter @vault/web preview` 필요)
 - `node apps/web/scripts/shots.mjs <폴더> [light|dark]` (디자인 검토용 화면 캡처, 개발 서버 필요)
 - `supabase start` / `supabase db reset` (Pro 모듈 작업 시)

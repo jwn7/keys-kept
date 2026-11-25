@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { compromisedBy, detectKey, envAgeFileName, envMatrix, formatEnv, generateSecret, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
-import { useApp } from '../app/store';
+import { compromisedBy, detectKey, envAgeFileName, envMatrix, formatEnv, generateSecret, isShareIdentity, isShareRecipient, newShareIdentity, openEnvWith, recipientFingerprint, recipientOf, sealEnvFor, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
+import { registerEditorFlush, useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
-import { dayKey, downloadBytes, formatDay } from '../app/util';
+import { dayKey, downloadBytes, formatDay, pickFile } from '../app/util';
 import { CopyIcon } from '../components/Icons';
 
 const K = ko.keys;
@@ -121,24 +121,26 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
     setEnv(note.secret.env ?? '');
   }, [note.secret.value, note.secret.env]);
 
-  const save = (patch: Partial<SecretInfo>) => {
+  const save = async (patch: Partial<SecretInfo>): Promise<void> => {
     const cur = latest.current.note;
-    if (!cur.secret) return;
-    void app.session.save({ id: cur.id, secret: { ...cur.secret, ...patch } });
+    if (!cur.secret || app.session.isLocked) return;
+    await app.session.save({ id: cur.id, secret: { ...cur.secret, ...patch } });
     if (app.backendKind !== 'memory') app.scheduler.requestNow();
   };
-  const flush = () => {
+  const flush = (): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     const { note: cur, value: v, env: e } = latest.current;
     const nextEnv = e.trim() || null;
-    if (cur.secret && (cur.secret.value !== v || cur.secret.env !== nextEnv)) save({ value: v, env: nextEnv });
+    return cur.secret && (cur.secret.value !== v || cur.secret.env !== nextEnv) ? save({ value: v, env: nextEnv }) : Promise.resolve();
   };
+  // 잠그기 전에 아직 저장 안 된 입력을 저장하게 등록한다 (값을 치고 바로 잠가도 사라지지 않게)
+  useEffect(() => registerEditorFlush(flush), []);
   const schedule = () => {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(flush, 600);
+    timer.current = setTimeout(() => void flush(), 600);
   };
-  useEffect(() => () => flush(), []); // 닫히거나 다른 키로 갈 때(= 이 인스턴스가 사라질 때) 남은 입력을 저장
+  useEffect(() => () => void flush(), []); // 닫히거나 다른 키로 갈 때(= 이 인스턴스가 사라질 때) 남은 입력을 저장
 
   const today = dayKey(new Date());
   const d = useMemo(() => detectKey(value), [value]);
@@ -149,7 +151,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
   const addPlace = async () => {
     const p = await ui.prompt({ title: K.usedIn, label: K.placeLabel, suggestions: [...new Set([app.deviceName, ...places])].filter((x) => !note.secret.usedIn.includes(x)), confirmLabel: K.add });
     const name = p?.trim();
-    if (name && !note.secret.usedIn.includes(name)) save({ usedIn: [...note.secret.usedIn, name] });
+    if (name && !note.secret.usedIn.includes(name)) void save({ usedIn: [...note.secret.usedIn, name] });
   };
 
   return (
@@ -183,7 +185,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
               setValue(e.target.value);
               schedule();
             }}
-            onBlur={flush}
+            onBlur={() => void flush()}
           />
           <button type="button" className="btn btn-sm" aria-pressed={show} onClick={() => setShow((s) => !s)}>{show ? ko.common.hide : ko.common.show}</button>
           <button type="button" className="btn btn-primary btn-sm" disabled={!value} onClick={() => void copySecret(value)}>{K.copy}</button>
@@ -200,7 +202,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
               onClick={() => {
                 const v = generateSecret(kind);
                 setValue(v);
-                save({ value: v });
+                void save({ value: v });
                 ui.toast(K.generated);
               }}
             >
@@ -222,7 +224,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
               setEnv(e.target.value);
               schedule();
             }}
-            onBlur={flush}
+            onBlur={() => void flush()}
           />
           <datalist id="secret-envs">
             {envs.map((e) => (
@@ -236,7 +238,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
             {note.secret.usedIn.map((p) => (
               <span key={p} className="chip">
                 {p}
-                <button type="button" className="chip-x" aria-label={K.removePlace(p)} onClick={() => save({ usedIn: note.secret.usedIn.filter((x) => x !== p) })}>×</button>
+                <button type="button" className="chip-x" aria-label={K.removePlace(p)} onClick={() => void save({ usedIn: note.secret.usedIn.filter((x) => x !== p) })}>×</button>
               </span>
             ))}
             <button type="button" className="chip chip-add" onClick={() => void addPlace()}>+ {K.add}</button>
@@ -325,6 +327,7 @@ export function EnvImportDialog({ initialText, project: initialProject, onClose 
           </div>
         </div>
         <div className="actions">
+          <button type="button" className="btn-link" style={{ marginRight: 'auto' }} onClick={() => void openReceivedFile(notes).then((t) => t !== null && setText(t))}>{K.share.receive}</button>
           <button type="button" className="btn btn-sm" onClick={onClose}>{ko.common.cancel}</button>
           <button type="button" className="btn btn-primary btn-sm" disabled={busy || willChange === 0} onClick={() => void run()}>{K.importRun(willChange)}</button>
         </div>
@@ -514,4 +517,140 @@ export function CompareTable({ project }: { project: string | null }) {
       </div>
     </div>
   );
+}
+
+// ---------- 팀 공유: 파일로 주고받기 (docs/TEAM.md) ----------
+
+/** 금고 안의 내 공유 개인키. 값의 모양으로 찾는다(이름은 사용자가 바꿀 수 있다). */
+export function findShareIdentity(notes: Note[]): string | null {
+  return notes.find((n) => isSecret(n) && isShareIdentity(n.secret.value))?.secret?.value.trim() ?? null;
+}
+
+/**
+ * 받는 사람의 공개키로 잠근 .env.age를 만든다. 받는 사람만 열 수 있고 비밀번호를 주고받지 않는다.
+ * 내 공유 열쇠와 팀원의 공개키는 금고의 키 항목으로 둔다(프로젝트 "팀"): 다른 키와 똑같이 암호화되고 동기화된다.
+ */
+export function ShareDialog({ project, env, onClose }: { project: string | null; env: string | null; onClose: () => void }) {
+  const app = useApp((s) => s.app);
+  const notes = useApp((s) => s.notes);
+  const S = K.share;
+  const identity = useMemo(() => findShareIdentity(notes), [notes]);
+  const people = useMemo(() => notes.filter((n): n is Note & { secret: SecretInfo } => isSecret(n) && isShareRecipient(n.secret.value)), [notes]);
+  const [mine, setMine] = useState<{ recipient: string; print: string } | null>(null);
+  const [prints, setPrints] = useState<Record<string, string>>({});
+  const [picked, setPicked] = useState<string[]>([]);
+  const [name, setName] = useState('');
+  const [key, setKey] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!identity) return setMine(null);
+    void recipientOf(identity).then(async (recipient) => setMine({ recipient, print: await recipientFingerprint(recipient) }));
+  }, [identity]);
+  useEffect(() => {
+    void Promise.all(people.map(async (p) => [p.id, await recipientFingerprint(p.secret.value)] as const)).then((rows) => setPrints(Object.fromEntries(rows)));
+  }, [people]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const create = async () => {
+    const id = await newShareIdentity();
+    await app.session.save({ title: S.myKeyName, folder: S.folder, secret: { value: id.identity, env: null, usedIn: [] } });
+  };
+  const addPerson = async () => {
+    const k = key.trim();
+    if (!isShareRecipient(k)) return setError(S.badKey);
+    setError(null);
+    const n = await app.session.save({ title: name.trim() || k.slice(0, 12), folder: S.folder, secret: { value: k, env: null, usedIn: [] } });
+    setPicked((p) => [...p, n.id]);
+    setName('');
+    setKey('');
+  };
+  const make = async () => {
+    if (!mine) return;
+    setBusy(true);
+    try {
+      const r = await projectEnvText(notes, project, env);
+      if (!r) return;
+      const to = people.filter((p) => picked.includes(p.id)).map((p) => p.secret.value);
+      const file = envAgeFileName(r.env);
+      downloadBytes(file, await sealEnvFor(envForProject(notes, { project, env: r.env }), [mine.recipient, ...to])); // 나도 열 수 있게 내 공개키를 넣는다
+      ui.toast(S.made(file, to.length));
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="overlay center" onClick={onClose}>
+      <div className="dialog share-dialog" role="dialog" aria-label={S.title} onClick={(e) => e.stopPropagation()}>
+        <h2>{S.title}</h2>
+        <p className="small muted">{S.intro}</p>
+        {!mine ? (
+          <div className="share-block">
+            <p className="small">{S.noIdentity}</p>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void create()}>{S.create}</button>
+          </div>
+        ) : (
+          <>
+            <div className="share-block">
+              <div className="field-label">{S.mine}</div>
+              <code className="share-key" data-testid="my-recipient">{mine.recipient}</code>
+              <div className="share-row">
+                <span className="small muted">{S.fingerprint} <span className="share-print">{mine.print}</span></span>
+                <button type="button" className="btn btn-sm" onClick={() => void navigator.clipboard.writeText(mine.recipient).then(() => ui.toast(S.copiedMine))}>{S.copyMine}</button>
+              </div>
+            </div>
+            <div className="share-block">
+              <div className="field-label">{S.people}</div>
+              {people.length === 0 && <p className="small muted">{S.noPeople}</p>}
+              {people.map((p) => (
+                <label key={p.id} className="share-person">
+                  <input type="checkbox" checked={picked.includes(p.id)} onChange={() => setPicked((cur) => (cur.includes(p.id) ? cur.filter((x) => x !== p.id) : [...cur, p.id]))} />
+                  <span className="share-name">{p.title}</span>
+                  <span className="share-print muted">{prints[p.id] ?? ''}</span>
+                </label>
+              ))}
+              <div className="share-add">
+                <input className="secret-env" aria-label={S.addName} placeholder={S.addName} value={name} onChange={(e) => setName(e.target.value)} />
+                <input className="secret-env" aria-label={S.addKey} placeholder={S.addKey} value={key} spellCheck={false} onChange={(e) => setKey(e.target.value)} />
+                <button type="button" className="btn btn-sm" disabled={!key.trim()} onClick={() => void addPerson()}>{S.add}</button>
+              </div>
+              {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
+              <p className="small muted">{S.verify}</p>
+            </div>
+            <p className="small muted">{S.limit}</p>
+          </>
+        )}
+        <div className="actions">
+          <button type="button" className="btn btn-sm" onClick={onClose}>{ko.common.cancel}</button>
+          {mine && <button type="button" className="btn btn-primary btn-sm" disabled={busy || picked.length === 0} onClick={() => void make()}>{S.make(picked.length)}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 팀원이 내 공개키로 잠가 보낸 파일을 골라 연다. 돌려주는 값: .env 글 (넣기 창에 채운다). */
+export async function openReceivedFile(notes: Note[]): Promise<string | null> {
+  const identity = findShareIdentity(notes);
+  if (!identity) {
+    ui.toast(K.share.receiveNoIdentity);
+    return null;
+  }
+  const [file] = await pickFile('.age');
+  if (!file) return null;
+  try {
+    const entries = await openEnvWith(new Uint8Array(await file.arrayBuffer()), identity);
+    ui.toast(K.share.received(entries.length));
+    return formatEnv(entries);
+  } catch {
+    ui.toast(K.share.receiveFailed);
+    return null;
+  }
 }

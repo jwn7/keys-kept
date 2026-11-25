@@ -46,9 +46,12 @@ export function resolveEnvFile({ file, cwd = process.cwd(), branch } = {}) {
       /* 잘못된 설정은 없는 것으로 본다 */
     }
     const env = pickEnvForBranch(cfg, branch ?? currentBranch(cwd));
-    if (env && existsSync(join(cwd, `.env.${env}.age`))) return { file: join(cwd, `.env.${env}.age`), env };
+    // 브라우저는 내려받을 때 이름 맨 앞의 점을 뗀다(`.env.prod.age` → `env.prod.age`). 둘 다 찾는다.
+    for (const name of env ? [`.env.${env}.age`, `env.${env}.age`] : []) {
+      if (existsSync(join(cwd, name))) return { file: join(cwd, name), env };
+    }
   }
-  return { file: join(cwd, '.env.age'), env: null };
+  return { file: !existsSync(join(cwd, '.env.age')) && existsSync(join(cwd, 'env.age')) ? join(cwd, 'env.age') : join(cwd, '.env.age'), env: null };
 }
 
 /** `.env.example`이 요구하는 이름 중 금고에 없는 것. */

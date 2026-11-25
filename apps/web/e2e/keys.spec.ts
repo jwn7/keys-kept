@@ -88,6 +88,21 @@ test('키를 차례로 열어도 값이 서로 섞이지 않는다 (열었던 �
   }
 });
 
+test('값을 치고 0.6초 안에 잠가도 그 입력이 남는다', async ({ page }) => {
+  await setup(page);
+  await page.getByLabel('빠른 메모').fill('SESSION_SECRET=first-value-123456');
+  await page.getByLabel('빠른 메모').press('Enter');
+  await page.locator('.key-row', { hasText: 'SESSION_SECRET' }).locator('.key-main').click();
+  const value = page.getByLabel('값', { exact: true });
+  await value.fill('second-value-abcdef');
+  await page.keyboard.press('Control+l'); // 저장을 기다리지 않고 바로 잠근다
+  await expect(page.getByRole('heading', { name: '잠금 해제' })).toBeVisible();
+  await page.locator('#pw').fill(PASSWORD);
+  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await page.locator('.key-row', { hasText: 'SESSION_SECRET' }).locator('.key-main').click();
+  await expect(value).toHaveValue('second-value-abcdef');
+});
+
 test('꺼내 쓰기: Ctrl+K → 이름 → Enter로 값 복사, Shift+Enter로 이름=값 복사', async ({ page }) => {
   await setup(page);
   await page.getByLabel('빠른 메모').fill(`OPENAI_API_KEY=${OPENAI}`);
@@ -216,4 +231,76 @@ test('환경 비교표: 한 환경에만 빠진 값을 찾아 주고, 빠진 칸
   await page.locator('.secret-generate').getByRole('button', { name: '32바이트' }).click();
   await expect(page.getByLabel('값', { exact: true })).toHaveValue(/^[A-Za-z0-9_-]{43}$/);
   await expect(page.locator('.compare-summary')).toHaveText('빠진 값이 없습니다');
+});
+
+test('팀 공유: 받는 사람의 공개키로 잠근 파일을 만들고, 받는 사람은 자기 금고에서 연다', async ({ browser }) => {
+  const open = async () => {
+    const ctx = await browser.newContext({ locale: 'ko-KR', viewport: { width: 1280, height: 800 }, acceptDownloads: true });
+    const page = await ctx.newPage();
+    await setup(page);
+    return { ctx, page };
+  };
+  const importShop = async (page: Page, lines: string[]) => {
+    await page.getByRole('button', { name: '.env 넣기' }).click();
+    const dialog = page.getByRole('dialog', { name: '.env 넣기' });
+    await dialog.getByPlaceholder('프로젝트 이름').fill('shop');
+    await dialog.getByRole('textbox', { name: '.env 내용을 붙여 넣으세요' }).fill(lines.join('\n'));
+    await dialog.getByRole('button', { name: /개 넣기/ }).click();
+    await expect(dialog).toHaveCount(0);
+  };
+
+  // 받는 사람(B): 공유 열쇠를 만들고 공개키를 알려 준다
+  const b = await open();
+  await importShop(b.page, ['PLACEHOLDER_KEY=placeholder-value-1']);
+  await b.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  await b.page.getByRole('button', { name: '공유 열쇠 만들기' }).click();
+  const bobKey = (await b.page.getByTestId('my-recipient').textContent())!.trim();
+  expect(bobKey).toMatch(/^age1/);
+  await b.page.getByRole('dialog', { name: '팀원에게 보내기' }).getByRole('button', { name: '취소' }).click();
+
+  // 보내는 사람(A): 팀원을 등록하고 프로젝트를 그 사람 앞으로 잠근다
+  const a = await open();
+  await importShop(a.page, [`OPENAI_API_KEY=${OPENAI}`, 'DATABASE_URL=postgres://u:p@host/db']);
+  await a.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  const share = a.page.getByRole('dialog', { name: '팀원에게 보내기' });
+  await share.getByRole('button', { name: '공유 열쇠 만들기' }).click();
+  await share.getByLabel('이름').fill('밥');
+  await share.getByLabel('공개키 (age1…)').fill('AGE-SECRET-KEY-1NOTAPUBLICKEYNOTAPUBLICKEY'); // 개인키를 잘못 넣으면 막는다
+  await share.getByRole('button', { name: '팀원 추가' }).click();
+  await expect(share).toContainText('공개키가 아닙니다');
+  await share.getByLabel('공개키 (age1…)').fill(bobKey);
+  await share.getByRole('button', { name: '팀원 추가' }).click();
+  await expect(share.locator('.share-person', { hasText: '밥' }).getByRole('checkbox')).toBeChecked();
+  const [download] = await Promise.all([a.page.waitForEvent('download'), share.getByRole('button', { name: '1명에게 보낼 파일 만들기' }).click()]);
+  expect(download.suggestedFilename()).toBe('env.age'); // 브라우저는 내려받을 때 이름 맨 앞의 점을 뗀다. vault-run은 두 이름을 다 찾는다
+  const path = await download.path();
+  const { readFileSync } = await import('node:fs');
+  const bytes = readFileSync(path);
+  expect(bytes.subarray(0, 21).toString()).toBe('age-encryption.org/v1');
+  expect(bytes.toString('latin1')).not.toContain(OPENAI); // 파일에는 값이 그대로 없다
+
+  // B가 받은 파일을 자기 금고의 개인키로 연다
+  await b.page.getByRole('button', { name: '.env 넣기' }).click();
+  const dialog = b.page.getByRole('dialog', { name: '.env 넣기' });
+  const [chooser] = await Promise.all([b.page.waitForEvent('filechooser'), dialog.getByRole('button', { name: '받은 파일 열기 (.age)' }).click()]);
+  await chooser.setFiles({ name: '.env.age', mimeType: 'application/octet-stream', buffer: bytes });
+  await expect(dialog).toContainText('2개를 찾았습니다');
+  await expect(dialog.locator('.env-row', { hasText: 'OPENAI_API_KEY' })).toContainText('OpenAI');
+  await dialog.getByPlaceholder('프로젝트 이름').fill('shop');
+  await dialog.getByRole('button', { name: '2개 넣기' }).click();
+  await b.page.locator('.key-row', { hasText: 'OPENAI_API_KEY' }).locator('.key-main').click();
+  await expect(b.page.getByLabel('값', { exact: true })).toHaveValue(OPENAI);
+
+  // 받는 사람이 아닌 제3자는 못 연다
+  const c = await open();
+  await importShop(c.page, ['PLACEHOLDER_KEY=placeholder-value-1']);
+  await c.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  await c.page.getByRole('button', { name: '공유 열쇠 만들기' }).click();
+  await c.page.getByRole('dialog', { name: '팀원에게 보내기' }).getByRole('button', { name: '취소' }).click();
+  await c.page.getByRole('button', { name: '.env 넣기' }).click();
+  const [chooser2] = await Promise.all([c.page.waitForEvent('filechooser'), c.page.getByRole('button', { name: '받은 파일 열기 (.age)' }).click()]);
+  await chooser2.setFiles({ name: '.env.age', mimeType: 'application/octet-stream', buffer: bytes });
+  await expect(c.page.getByText('이 파일을 열 수 없습니다')).toBeVisible();
+
+  await Promise.all([a.ctx.close(), b.ctx.close(), c.ctx.close()]);
 });

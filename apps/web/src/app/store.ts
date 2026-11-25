@@ -173,16 +173,16 @@ export const useApp = create<AppState>((set, get) => {
  * 편집기가 아직 저장하지 않은 입력(1초 디바운스 대기분)을 지금 저장하게 하는 훅.
  * 잠금은 메모리의 열쇠를 지우므로, 잠그기 전에 반드시 이걸 먼저 기다려야 마지막 입력이 사라지지 않는다.
  */
-let editorFlush: (() => Promise<void>) | null = null;
+const flushers = new Set<() => Promise<void>>();
 export function registerEditorFlush(fn: () => Promise<void>): () => void {
-  editorFlush = fn;
+  flushers.add(fn);
   return () => {
-    if (editorFlush === fn) editorFlush = null;
+    flushers.delete(fn);
   };
 }
 export async function flushEditor(): Promise<void> {
   try {
-    await editorFlush?.();
+    await Promise.all([...flushers].map((f) => f()));
   } catch {
     /* 저장 실패는 편집기가 표시한다 */
   }

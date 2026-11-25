@@ -164,3 +164,103 @@ describe('개발 흐름 연결', () => {
     expect(spawnSync(process.execPath, [bin('vault-check.mjs'), '--file', file, '--example', ex], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } }).status).toBe(0);
   });
 });
+
+import { newShareIdentity, sealEnvFor } from '@vault/core';
+
+describe('팀원이 내 공개키로 잠가 보낸 파일', () => {
+  it('vault-run이 내 개인키 파일로 열어 실행한다. 개인키는 실행하는 프로그램에 넘기지 않는다', async () => {
+    const me = await newShareIdentity();
+    const shared = join(dir, 'shared.env.age');
+    const idFile = join(dir, 'identity.txt');
+    writeFileSync(shared, await sealEnvFor(ENTRIES, [me.recipient]));
+    writeFileSync(idFile, `# 내 공유 열쇠\n${me.identity}\n`);
+    const env = { ...process.env, VAULT_ENV_IDENTITY_FILE: idFile } as Record<string, string>;
+    delete env.VAULT_ENV_PASSPHRASE;
+    const r = spawnSync(process.execPath, [bin('vault-run.mjs'), '--file', shared, '--', process.execPath, '-e', 'console.log(JSON.stringify([process.env.OPENAI_API_KEY, process.env.VAULT_ENV_IDENTITY_FILE ?? null]))'], { encoding: 'utf8', env });
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toEqual([SECRET, null]);
+
+    const other = await newShareIdentity();
+    writeFileSync(idFile, other.identity);
+    expect(spawnSync(process.execPath, [bin('vault-run.mjs'), '--file', shared, '--', process.execPath, '-e', '1'], { encoding: 'utf8', env }).status).toBe(1);
+  });
+});
+
+// @ts-expect-error 순수 JS 모듈이라 타입 선언이 없다
+import { spawnPlan, winQuote } from '../src/index.mjs';
+
+describe('검토에서 나온 결함', () => {
+  it('여러 줄 값: core와 같은 결과 (따옴표 안의 줄바꿈)', () => {
+    const sample = 'A=1\nPEM="-----BEGIN-----\nMIIabc\nabcd==\n-----END-----"\nS=\'l1\nl2\'\nBAD="oops\nB=2';
+    expect(parseEnv(sample)).toEqual(coreParseEnv(sample));
+    expect(parseEnv(sample).find((e: { name: string }) => e.name === 'PEM').value).toContain('MIIabc\nabcd==');
+  });
+
+  it('winQuote: 공백·따옴표·역슬래시를 감싸고, %이름%은 거절한다', () => {
+    expect(winQuote('a b')).toBe('"a b"');
+    expect(winQuote('x&echo INJECTED')).toBe('"x&echo INJECTED"');
+    expect(winQuote('say "hi"')).toBe('"say \\"hi\\""');
+    expect(winQuote('C:\\dir\\')).toBe('"C:\\dir\\\\"');
+    expect(() => winQuote('%PATH%')).toThrow();
+  });
+
+  it('공백이나 &가 든 인자가 그대로 한 인자로 전달되고, 끼워 넣은 명령은 실행되지 않는다', () => {
+    // 확장자 없는 `node`는 Windows에서 셸을 거친다. 그 길에서도 인자가 깨지지 않아야 한다.
+    const r = spawnSync(process.execPath, [bin('vault-run.mjs'), '--file', file, '--', 'node', '-e', 'console.log(JSON.stringify(process.argv.slice(1)))', 'a b', 'x&echo INJECTED'], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } });
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout.trim().split('\n')[0]!)).toEqual(['a b', 'x&echo INJECTED']);
+    expect(r.stdout).not.toMatch(/^INJECTED/m);
+    expect(spawnPlan(process.execPath, ['a b']).shell).toBe(false); // 실행 파일을 직접 가리키면 셸을 쓰지 않는다
+  });
+
+  it('vault-run: `--` 없이 --file 을 줘도 명령을 찾는다', () => {
+    const r = spawnSync(process.execPath, [bin('vault-run.mjs'), '--file', file, process.execPath, '-e', 'console.log(process.env.DATABASE_URL)'], { encoding: 'utf8', env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS } });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('postgres://u:p@host/db');
+  });
+
+  it('resolveEnvFile: 브라우저가 점을 떼고 내려받은 이름(env.prod.age)도 찾는다', () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-flow2-'));
+    writeFileSync(join(d, '.vault.json'), JSON.stringify({ branches: { main: 'prod' } }));
+    writeFileSync(join(d, 'env.prod.age'), 'x');
+    expect(resolveEnvFile({ cwd: d, branch: 'main' })).toEqual({ file: join(d, 'env.prod.age'), env: 'prod' });
+    writeFileSync(join(d, 'env.age'), 'x');
+    expect(resolveEnvFile({ cwd: d, branch: 'feature' })).toEqual({ file: join(d, 'env.age'), env: null });
+  });
+});
+
+describe('vault-mcp: 검토에서 나온 결함', () => {
+  const talk = (lines: string[], expectIds: number[]) =>
+    new Promise<Record<number, { result?: { content?: { text: string }[] } }>>((resolve, reject) => {
+      const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file } });
+      const got: Record<number, never> = {};
+      let buf = '';
+      child.on('exit', (code) => code !== null && code !== 0 && reject(new Error(`server exited ${code}`)));
+      child.stdout.on('data', (b: Buffer) => {
+        buf += b.toString();
+        for (const line of buf.split('\n').slice(0, -1)) {
+          const m = JSON.parse(line) as { id: number };
+          got[m.id] = m as never;
+        }
+        buf = buf.slice(buf.lastIndexOf('\n') + 1);
+        if (expectIds.every((id) => id in got)) {
+          child.kill();
+          resolve(got);
+        }
+      });
+      for (const l of lines) child.stdin.write(`${l}\n`);
+    });
+
+  it('`null`이나 숫자, 깨진 줄이 와도 죽지 않고 다음 요청에 답한다', async () => {
+    const r = await talk(['null', '42', '[1,2]', 'not json', JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'ping' })], [9]);
+    expect(r[9]!.result).toEqual({});
+  });
+
+  it('긴 출력의 잘리는 자리에 값이 걸쳐도 앞부분이 새지 않는다 (가린 뒤에 자른다)', async () => {
+    const code = `process.stdout.write('x'.repeat(${20_000 - 10}) + process.env.OPENAI_API_KEY)`;
+    const r = await talk([JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'run_with_keys', arguments: { command: process.execPath, args: ['-e', code], keys: ['OPENAI_API_KEY'] } } })], [1]);
+    const out = r[1]!.result!.content![0]!.text;
+    expect(out).not.toContain(SECRET.slice(0, 8));
+    expect(out).toContain('[OPENAI'); // 가림 표시는 잘릴 수 있지만 값은 한 글자도 남지 않는다
+  }, 30_000);
+});

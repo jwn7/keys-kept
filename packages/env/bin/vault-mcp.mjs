@@ -11,7 +11,7 @@
 // 비밀번호는 VAULT_ENV_PASSPHRASE 환경변수로 받는다(stdio는 프로토콜이 쓰므로 물을 수 없다).
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { needsShell, readEnvAge, redact } from '../src/index.mjs';
+import { readEnv, redact, spawnPlan } from '../src/index.mjs';
 
 const FILE = process.env.VAULT_ENV_FILE ?? '.env.age';
 const TIMEOUT_MS = 120_000;
@@ -39,17 +39,25 @@ const TOOLS = [
 const text = (t, isError = false) => ({ content: [{ type: 'text', text: t }], isError });
 
 async function entries() {
-  const pass = process.env.VAULT_ENV_PASSPHRASE;
-  if (!pass) throw new Error('VAULT_ENV_PASSPHRASE가 설정되지 않았습니다.');
-  return readEnvAge(FILE, pass);
+  // stdio는 프로토콜이 쓰므로 비밀번호를 물을 수 없다. 환경변수로 받은 것만 쓴다.
+  if (!process.env.VAULT_ENV_PASSPHRASE && !process.env.VAULT_ENV_IDENTITY && !process.env.VAULT_ENV_IDENTITY_FILE) throw new Error('VAULT_ENV_PASSPHRASE 또는 VAULT_ENV_IDENTITY_FILE이 설정되지 않았습니다.');
+  return readEnv(FILE);
 }
 
 function runCommand(command, args, env, cwd) {
   return new Promise((resolve) => {
     let out = '';
-    const child = spawn(command, args, { env, cwd, shell: needsShell(command) });
+    let plan;
+    try {
+      plan = spawnPlan(command, args);
+    } catch (e) {
+      return resolve({ code: 2, out: e instanceof Error ? e.message : String(e) });
+    }
+    const child = spawn(plan.command, plan.args, { env, cwd, shell: plan.shell });
+    // 자르기는 가린 뒤에 한다(아래 callTool). 여기서 자르면 잘린 자리에 걸친 값이 가려지지 않고 앞부분이 새어 나간다.
+    // 메모리만 지키려고 넉넉한 한도를 둔다.
     const add = (b) => {
-      if (out.length < MAX_OUTPUT) out += b.toString();
+      if (out.length < MAX_OUTPUT * 50) out += b.toString();
     };
     child.stdout.on('data', add);
     child.stderr.on('data', add);
@@ -60,7 +68,7 @@ function runCommand(command, args, env, cwd) {
     });
     child.on('exit', (code) => {
       clearTimeout(timer);
-      resolve({ code: code ?? 1, out: out.length >= MAX_OUTPUT ? `${out.slice(0, MAX_OUTPUT)}\n… (잘림)` : out });
+      resolve({ code: code ?? 1, out });
     });
   });
 }
@@ -79,11 +87,12 @@ async function callTool(name, a = {}) {
     const missing = a.keys.filter((k) => !all.some((e) => e.name === k));
     if (missing.length) return text(`금고에 없는 키: ${missing.join(', ')}. list_keys로 이름을 확인하거나 request_key로 사용자에게 요청하세요.`, true);
     const env = { ...process.env };
-    delete env.VAULT_ENV_PASSPHRASE; // 실행하는 프로그램에는 금고 비밀번호를 넘기지 않는다
+    for (const k of ['VAULT_ENV_PASSPHRASE', 'VAULT_ENV_IDENTITY', 'VAULT_ENV_IDENTITY_FILE']) delete env[k]; // 실행하는 프로그램에는 금고를 여는 것을 넘기지 않는다
     for (const e of all) if (a.keys.includes(e.name)) env[e.name] = e.value;
     const r = await runCommand(a.command, Array.isArray(a.args) ? a.args.map(String) : [], env, typeof a.cwd === 'string' ? a.cwd : undefined);
     // 고르지 않은 키의 값이 찍혀도 가린다
-    return text(`종료 코드 ${r.code}\n${redact(r.out, all)}`, r.code !== 0);
+    const safe = redact(r.out, all); // 먼저 가리고, 그다음 자른다
+    return text(`종료 코드 ${r.code}\n${safe.length > MAX_OUTPUT ? `${safe.slice(0, MAX_OUTPUT)}\n… (잘림)` : safe}`, r.code !== 0);
   }
   return text(`모르는 도구: ${name}`, true);
 }
@@ -97,6 +106,8 @@ createInterface({ input: process.stdin }).on('line', async (line) => {
   } catch {
     return;
   }
+  // `null`, 숫자, 배열 같은 줄에 죽지 않는다. 요청은 객체여야 한다.
+  if (req === null || typeof req !== 'object' || Array.isArray(req)) return;
   if (req.id === undefined) return; // 알림(notifications/initialized 등)에는 답하지 않는다
   const reply = (result) => send({ jsonrpc: '2.0', id: req.id, result });
   try {
