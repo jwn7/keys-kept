@@ -11,11 +11,15 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 1. **암호화 원시 함수를 직접 구현하지 않는다.** `libsodium-wrappers-sumo`만 쓴다. Argon2id = `crypto_pwhash`, 항목 암호화 = `crypto_aead_xchacha20poly1305_ietf_*`.
 2. **서버로 나가는 모든 바이트는 `packages/core/src/sync/` 를 통과하고, 그 전에 `crypto/`로 암호화돼 있어야 한다.** 평문 제목·본문·태그·폴더명이 네트워크 계층에 닿으면 버그다.
 3. root key(비밀번호에서 유도한 키)는 PC에서는 메모리에만 둔다. 디스크·localStorage·IndexedDB에 쓰지 않는다. 모바일(Tauri/Capacitor)에서만 OS 키체인에 저장하고 생체인증으로 꺼낸다.
+   - 패스키 잠금 해제(WebAuthn PRF, 2026-11 사용자 승인): 인증기가 매번 만들어 주는 비밀값으로 itemsKey를 한 번 더 **감싸** 이 기기 meta(`deviceUnlock`)에 둔다. 비밀값과 거기서 만든 키는 저장하지 않는다. 디스크에 있는 것은 감싼 열쇠뿐이고 서버로 가지 않는다. `VaultSession.enableDeviceUnlock` / `unlockWithDeviceSecret`.
+   - 같은 방식으로 이 기기 전용 작은 값(자동 백업 비밀번호)은 `sealLocal`로 itemsKey에 잠가 둔다. 평문으로 저장하지 않는다.
 4. 동기화 백엔드는 `SyncBackend` 인터페이스(`packages/core/src/sync/SyncBackend.ts`)로만 접근한다. Google Drive가 기본, Supabase는 Pro 옵션. UI는 어느 백엔드인지 몰라야 한다.
 5. 삭제는 tombstone(`deletedAt`)이다. 물리 삭제는 "계정 삭제" 흐름에서만.
 6. 충돌은 LWW(`updatedAt` 큰 쪽 채택) + 진 쪽을 "충돌 사본" 메모로 보존한다. 데이터를 조용히 버리지 않는다.
 7. 백업 파일은 **age 포맷**(`age-encryption` 패키지, 패스프레이즈 모드)이다. 자체 포맷을 만들지 않는다. `age -d`로 풀리는지가 테스트 기준.
 8. 런타임 의존성은 최소로: `libsodium-wrappers-sumo`, `age-encryption`, `dexie`, `@supabase/supabase-js`(Pro 모듈에서만), React. 새 런타임 의존성은 이유를 적고 추가한다.
+   - `@zxcvbn-ts/*`(apps/web): 약한 비밀번호가 위협 모델의 가장 큰 약점이라 추가. 비밀번호를 정하는 화면에서만 지연 로딩, 계산은 기기 안.
+   - `@fontsource/*`(빌드 자산): 외부 글꼴 서버 요청을 없애려고 글꼴을 번들에 넣음.
 9. 테스트 먼저. `packages/core`는 UI 없이 Vitest로 100% 돌아가야 한다. 암호화 라운드트립, 동기화 충돌, 백업 복구는 필수 테스트.
 10. 한국어 UI 문구는 `apps/web/src/i18n/ko.ts` 한 곳에 둔다.
 
@@ -32,6 +36,7 @@ docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
 ## 명령
 - `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
 - `pnpm --filter web dev` (localhost:5173)
+- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 7개)
 - `supabase start` / `supabase db reset` (Pro 모듈 작업 시)
 
 ## 작업 순서 (새 기능)

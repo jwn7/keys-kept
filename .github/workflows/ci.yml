@@ -20,3 +20,16 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r lint
       - run: pnpm -r test
+
+  # 화면 흐름: 처음 설정 → 작성 → 잠금 → 다시 열기, 빠른 메모, 캘린더. 러너에 설치된 Chrome을 쓴다.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vault/web e2e

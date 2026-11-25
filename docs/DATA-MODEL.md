@@ -11,6 +11,7 @@
                                  ▼
                            Note JSON ──▶ ciphertext (백엔드에 저장)
 복구키 12단어 ──Argon2id──▶ recoveryKey ──▶ wrappedItemsKey_recovery (백엔드에 저장)
+패스키 PRF 비밀값(32B) ──BLAKE2b(용도 문자열)──▶ deviceKey ──▶ wrappedItemsKey_device (이 기기 meta에만)
 ```
 
 - 비밀번호 변경 = `wrappedItemsKey`만 다시 생성. 메모 재암호화 없음.
@@ -24,7 +25,7 @@
 | `blobs` | `id` | 암호문 레코드 (아래 `EncryptedItem`) | 잠금 중에도 유지 |
 | `outbox` | `id` | 업로드 대기 `id` + `op`(put/delete) + `queuedAt` | 온라인 시 순서대로 플러시 |
 | `versions` | `++seq` (색인 `noteId`) | 과거 암호문 (최근 20개) + `savedAt`, `windowStart` | 로컬 전용. 자동 저장은 `windowStart`부터 5분 동안 같은 칸을 덮어쓴다 |
-| `meta` | `key` | `lastSyncAt`, `deviceId`, `deviceName`, `backend`, `kdfParams`, `wrappedItemsKey` | |
+| `meta` | `key` | `lastSyncAt`, `deviceId`, `deviceName`, `backend`, `itemsKeyRecord`, `deviceUnlock` | `deviceUnlock` = 패스키용 감싼 열쇠 `{credentialId, prfSalt, wrappedKey, createdAt}`. 이 기기 전용, 동기화 안 함 |
 
 복호화된 메모(`Note`)는 **메모리에만** (Zustand 스토어). 잠금 시 비움.
 
