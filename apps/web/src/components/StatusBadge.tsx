@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SyncStatus } from '@vault/core';
 import { ko } from '../i18n/ko';
+import { regrantFolder } from '../app/folderSync';
 import { relTime } from '../app/util';
 import { useApp } from '../app/store';
 
@@ -32,7 +33,8 @@ export function StatusBadge({ status, local }: { status: SyncStatus; local: bool
             const { app } = useApp.getState();
             setBusy(true);
             try {
-              await app.driveAuth?.reconnect();
+              if (app.backendKind === 'folder') await regrantFolder();
+              else await app.driveAuth?.reconnect();
               await app.session.sync();
             } catch {
               /* 창을 닫았으면 그대로 */
@@ -41,7 +43,7 @@ export function StatusBadge({ status, local }: { status: SyncStatus; local: bool
             }
           }}
         >
-          {ko.sync.reconnect}
+          {useApp.getState().app.backendKind === 'folder' ? ko.sync.reconnectFolder : ko.sync.reconnect}
         </button>
       );
     case 'conflict':

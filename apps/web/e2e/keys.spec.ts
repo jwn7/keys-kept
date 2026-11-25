@@ -150,7 +150,8 @@ test('.env 넣기: 항목으로 나누고, 공개되는 이름에 비밀 키가 
   await dialog.getByRole('button', { name: '취소' }).click();
 
   // 다시 .env로
-  await page.getByRole('button', { name: '.env 복사' }).click();
+  await page.getByRole('button', { name: '꺼내기' }).click();
+  await page.getByRole('menuitem', { name: '.env 복사' }).click();
   await expect(page.getByText('.env 4줄을 복사했습니다.')).toBeVisible();
   const text = await clipboard(page);
   console.log('CLIP', JSON.stringify(text));
@@ -252,7 +253,8 @@ test('팀 공유: 받는 사람의 공개키로 잠근 파일을 만들고, 받�
   // 받는 사람(B): 공유 열쇠를 만들고 공개키를 알려 준다
   const b = await open();
   await importShop(b.page, ['PLACEHOLDER_KEY=placeholder-value-1']);
-  await b.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  await b.page.getByRole('button', { name: '꺼내기' }).click();
+  await b.page.getByRole('menuitem', { name: '팀원에게 보내기' }).click();
   await b.page.getByRole('button', { name: '공유 열쇠 만들기' }).click();
   const bobKey = (await b.page.getByTestId('my-recipient').textContent())!.trim();
   expect(bobKey).toMatch(/^age1/);
@@ -261,7 +263,8 @@ test('팀 공유: 받는 사람의 공개키로 잠근 파일을 만들고, 받�
   // 보내는 사람(A): 팀원을 등록하고 프로젝트를 그 사람 앞으로 잠근다
   const a = await open();
   await importShop(a.page, [`OPENAI_API_KEY=${OPENAI}`, 'DATABASE_URL=postgres://u:p@host/db']);
-  await a.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  await a.page.getByRole('button', { name: '꺼내기' }).click();
+  await a.page.getByRole('menuitem', { name: '팀원에게 보내기' }).click();
   const share = a.page.getByRole('dialog', { name: '팀원에게 보내기' });
   await share.getByRole('button', { name: '공유 열쇠 만들기' }).click();
   await share.getByLabel('이름').fill('밥');
@@ -294,7 +297,8 @@ test('팀 공유: 받는 사람의 공개키로 잠근 파일을 만들고, 받�
   // 받는 사람이 아닌 제3자는 못 연다
   const c = await open();
   await importShop(c.page, ['PLACEHOLDER_KEY=placeholder-value-1']);
-  await c.page.getByRole('button', { name: '팀원에게 보내기' }).click();
+  await c.page.getByRole('button', { name: '꺼내기' }).click();
+  await c.page.getByRole('menuitem', { name: '팀원에게 보내기' }).click();
   await c.page.getByRole('button', { name: '공유 열쇠 만들기' }).click();
   await c.page.getByRole('dialog', { name: '팀원에게 보내기' }).getByRole('button', { name: '취소' }).click();
   await c.page.getByRole('button', { name: '.env 넣기' }).click();

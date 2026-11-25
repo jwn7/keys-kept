@@ -521,3 +521,11 @@ button.chip:hover { background: var(--line); color: var(--ink); }
 .share-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .share-add { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 @media (max-width: 767px) { .share-add { grid-template-columns: 1fr; } }
+
+/* ---- 꺼내기 메뉴, 좁은 칸에서 줄바꿈 정리 ---- */
+.export-menu { position: relative; }
+.export-menu .menu { min-width: 200px; }
+.menu button.muted { color: var(--muted); }
+.side-search span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-count { white-space: nowrap; }
+.env-bar .segment { flex-wrap: nowrap; }

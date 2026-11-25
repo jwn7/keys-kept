@@ -654,3 +654,50 @@ export async function openReceivedFile(notes: Note[]): Promise<string | null> {
     return null;
   }
 }
+
+// ---------- 꺼내기 메뉴 ----------
+
+/** 프로젝트를 꺼내는 길들을 단추 하나로 묶는다: 복사, 암호화해서 내려받기, 팀원에게 보내기, 평문으로 내려받기. */
+export function ExportMenu({ onCopy, onSealed, onShare, onPlain }: { onCopy: () => void; onSealed: () => void; onShare: () => void; onPlain: () => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const item = (label: string, run: () => void, muted = false) => (
+    <button
+      type="button"
+      role="menuitem"
+      className={muted ? 'muted' : undefined}
+      onClick={() => {
+        setOpen(false);
+        run();
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <span ref={wrap} className="export-menu">
+      <button type="button" className="btn btn-sm" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{K.exportMenu}</button>
+      {open && (
+        <div role="menu" className="menu">
+          {item(K.exportCopy, onCopy)}
+          {item(K.sealed, onSealed)}
+          {item(K.share.open, onShare)}
+          {item(K.download, onPlain, true)}
+        </div>
+      )}
+    </span>
+  );
+}

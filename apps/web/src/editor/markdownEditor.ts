@@ -75,7 +75,7 @@ function slashSource(ctx: CompletionContext): CompletionResult | null {
     { label: '/bullet', detail: ko.editor.slash.bullet, insert: '- ' },
     { label: '/number', detail: ko.editor.slash.number, insert: '1. ' },
     { label: '/code', detail: ko.editor.slash.code, insert: '```\n\n```', cursor: 4 },
-    { label: '/table', detail: ko.editor.slash.table, insert: '| 열 1 | 열 2 |\n| --- | --- |\n|  |  |\n', cursor: 2 },
+    { label: '/table', detail: ko.editor.slash.table, insert: `| ${ko.editor.tableCols[0]} | ${ko.editor.tableCols[1]} |\n| --- | --- |\n|  |  |\n`, cursor: 2 },
     { label: '/hr', detail: ko.editor.slash.hr, insert: '---\n' },
     { label: '/date', detail: ko.editor.slash.date, insert: todayTitle() + ' ' },
   ];

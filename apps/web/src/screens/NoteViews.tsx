@@ -8,6 +8,13 @@ import { ko } from '../i18n/ko';
 import { dayKey, displayTitle, formatDay, monthGrid, noteDay, relTime, snippet } from '../app/util';
 import { PinIcon } from '../components/Icons';
 
+// core가 충돌 사본 제목 끝에 붙이는 표식 `제목 (충돌 사본 — 기기 시각)`. 화면 문구가 아니라 저장된 제목의 형식이라 언어와 무관하게 이 글자다.
+const CONFLICT_MARK = '(충돌 사본 — ';
+/** 충돌 사본 제목에서 꼬리표(기기 이름과 시각)만 떼어 고른 언어로 보여 준다. */
+function conflictFlag(title: string): string {
+  return ko.sync.conflictFlag(title.slice(title.indexOf(CONFLICT_MARK) + CONFLICT_MARK.length, -1));
+}
+
 /**
  * 빠른 메모: 한 줄 쓰고 Enter → 새 메모 (편집기로 넘어가지 않고 계속 적을 수 있다).
  * 캘린더에서 고른 날이 있으면 그 날짜의 일정으로 만든다. Shift+Enter는 만들고 바로 연다.
@@ -136,7 +143,7 @@ function PlainRow({ n, now, hideDate }: { n: Note; now: number; hideDate?: boole
       {((n.date && !hideDate) || isConflictCopy(n)) && (
         <div className="row-meta">
           {!hideDate && <DateChip date={n.date} />}
-          {isConflictCopy(n) && <span className="conflict-flag">{n.title.slice(n.title.indexOf('(충돌 사본') + 1, -1)}</span>}
+          {isConflictCopy(n) && <span className="conflict-flag">{conflictFlag(n.title)}</span>}
         </div>
       )}
     </button>

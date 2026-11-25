@@ -4,7 +4,7 @@ import { useApp } from '../app/store';
 import { GisDriveAuth } from '../app/driveAuth';
 import { GOOGLE_CLIENT_ID, setDeviceName } from '../app/session';
 import { proAvailable, proSessionEmail, proSignIn, proSignOut, setProEnabled } from '../pro/supabase';
-import { ko } from '../i18n/ko';
+import { ko, lang, setLang, type Lang } from '../i18n/ko';
 import { downloadBytes, pickDirectoryFiles, relTime, shareOrDownload } from '../app/util';
 import { usePasswordScore } from '../app/strength';
 import { StatusBadge } from '../components/StatusBadge';
@@ -12,6 +12,7 @@ import { ui } from '../app/ui';
 import { createPasskey, passkeySupported } from '../app/passkey';
 import { autoBackupSupported, backupFolder, disableAutoBackup, enableAutoBackup, folderPermission, runAutoBackup } from '../app/autoBackup';
 import { BackIcon } from '../components/Icons';
+import { connectFolder, disconnectFolder, folderSyncSupported, syncFolder } from '../app/folderSync';
 import { RestoreCard } from './UnlockScreen';
 import { loadMetrics, summarize } from '../app/metrics';
 
@@ -62,6 +63,44 @@ export function SettingsScreen() {
           <UsageSection />
         </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** 폴더를 저장소로: Drive 계정 없이, 사용자가 이미 쓰는 동기화 도구에 얹는다. */
+function FolderCard() {
+  const app = useApp((s) => s.app);
+  const on = app.backendKind === 'folder';
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    if (on) void syncFolder().then((d) => setName(d?.name ?? null));
+  }, [on]);
+  const connect = async () => {
+    if (await connectFolder()) window.location.reload(); // 저장소가 바뀌므로 세션을 새로 만든다 (Drive 연결과 같은 방식)
+  };
+  const disconnect = async () => {
+    if (!(await ui.confirm({ title: S.sync.folderDisconnectTitle, body: S.sync.folderDisconnectConfirm, confirmLabel: S.sync.driveDisconnect, danger: true }))) return;
+    await disconnectFolder();
+    window.location.reload();
+  };
+  return (
+    <div className="sync-card">
+      <div className="head">
+        <span>{S.sync.folder}</span>
+        {on ? <span className="badge ok" style={{ fontSize: 11 }}>{S.sync.driveInUse}</span> : <span className="badge muted" style={{ fontSize: 11 }}>{S.sync.driveOff}</span>}
+      </div>
+      <div className="small muted">{on && name ? S.sync.folderOn(name) : S.sync.folderDesc}</div>
+      {!folderSyncSupported() && <div className="small" style={{ color: 'var(--warn)' }}>{S.sync.folderUnsupported}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+        {on ? (
+          <>
+            <button type="button" className="btn btn-sm" onClick={() => void app.session.sync()}>{ko.sync.now}</button>
+            <button type="button" className="btn-link muted" onClick={() => void disconnect()}>{S.sync.driveDisconnect}</button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-sm" disabled={!folderSyncSupported()} onClick={() => void connect()}>{S.sync.folderConnect}</button>
+        )}
       </div>
     </div>
   );
@@ -154,6 +193,7 @@ function SyncSection() {
             )}
           </div>
         </div>
+        <FolderCard />
         <div className="sync-card pro">
           <div className="head">
             <span>{S.sync.pro}</span>
@@ -468,6 +508,7 @@ function DataSection() {
     if (!ok) return;
     await app.session.purgeEverything();
     await disableAutoBackup(); // 이 기기에 남긴 폴더 권한과 잠근 백업 비밀번호도 지운다
+    await disconnectFolder(); // 동기화 폴더 권한도 지운다 (폴더 안의 암호문은 purgeEverything이 지웠다)
     app.driveAuth?.disconnect();
     try {
       localStorage.clear();
@@ -517,6 +558,13 @@ function UsageSection() {
   );
 }
 
+/** 문구는 앱을 읽을 때 한 번 정해지므로, 언어를 바꾸면 저장하고 새로 고친다 (잠금 화면으로 돌아간다). */
+function changeLang(next: Lang) {
+  if (next === lang) return;
+  setLang(next);
+  window.location.reload();
+}
+
 function LookSection() {
   const theme = useApp((s) => s.theme);
   const fontSize = useApp((s) => s.fontSize);
@@ -541,6 +589,12 @@ function LookSection() {
         <span>{S.look.editorWidth}</span>
         <div className="segment" role="group" aria-label={S.look.editorWidth}>
           {(['narrow', 'normal', 'wide'] as const).map((t) => <button key={t} type="button" aria-pressed={editorWidth === t} onClick={() => setPref('editorWidth', t)}>{S.look.widths[t]}</button>)}
+        </div>
+      </div>
+      <div className="row">
+        <span>{S.look.language}</span>
+        <div className="segment" role="group" aria-label={S.look.language}>
+          {(['ko', 'en'] as const).map((t) => <button key={t} type="button" lang={t} aria-pressed={lang === t} onClick={() => changeLang(t)}>{S.look.languages[t]}</button>)}
         </div>
       </div>
     </section>

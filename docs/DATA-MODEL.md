@@ -17,6 +17,7 @@
 - 비밀번호 변경 = `wrappedItemsKey`만 다시 생성. 메모 재암호화 없음.
 - `itemsKey`는 프로토콜 버전당 1개. 향후 버전 업 시 새 itemsKey로 점진 재암호화.
 - AAD(추가 인증 데이터)에 `{v: 1, id, type}`을 넣어 암호문 바꿔치기를 막는다.
+- 폴더 저장소(`FolderBackend`)의 파일: 항목마다 `<id>.enc`(`EncryptedItem` JSON 그대로), 열쇠 기록은 `vault.json`. Drive와 같은 내용이고 암호문뿐이다.
 - 암호화 전에 Note JSON 뒤를 공백으로 채워 구간 크기에 맞춘다(256바이트 이하는 256, 그 위는 Padmé 구간). 암호문 길이로 메모 길이를 알 수 없게 하려는 것이고, JSON 뒤 공백이라 형식은 그대로다 (`crypto/padding.ts`).
 
 ## 로컬 (기기) — IndexedDB via Dexie, Tauri는 SQLite

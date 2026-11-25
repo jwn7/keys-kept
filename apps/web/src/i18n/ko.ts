@@ -1,5 +1,10 @@
-/** 한국어 UI 문구는 전부 여기. (CLAUDE.md 규칙 10) */
-export const ko = {
+import { en } from './en';
+
+/**
+ * 한국어 UI 문구는 전부 여기. (CLAUDE.md 규칙 10) 영어는 같은 모양의 ./en.ts.
+ * 앱 코드는 예전처럼 `ko`를 가져다 쓴다: `ko`는 "지금 고른 언어의 문구"다 (맨 아래 참고).
+ */
+const korean = {
   app: {
     name: 'Vault',
     tagline: '나만 여는 키 장부',
@@ -90,6 +95,9 @@ export const ko = {
     pending: (n: number) => `업로드 대기 ${n}개`,
     rollback: (n: number) => `서버에 옛 버전이 있던 메모 ${n}개를 이 기기의 최신본으로 되돌려 놓았습니다.`,
     reconnect: 'Drive 다시 연결',
+    reconnectFolder: '폴더 다시 허용',
+    // 충돌 사본 제목 끝에 core가 붙이는 꼬리표(기기 이름과 시각)를 목록에 보여 줄 때
+    conflictFlag: (from: string) => `충돌 사본 — ${from}`,
     reconnectHint: (n: number) => (n > 0 ? `로그인이 만료됐습니다. 변경 ${n}개가 이 기기에 안전하게 남아 있습니다.` : '로그인이 만료됐습니다.'),
   },
   main: {
@@ -167,6 +175,7 @@ export const ko = {
       h1: '제목 1', h2: '제목 2', h3: '제목 3', todo: '체크박스', bullet: '글머리 기호', number: '번호 목록',
       code: '코드 블록', table: '표', hr: '구분선', date: '오늘 날짜',
     },
+    tableCols: ['열 1', '열 2'],
     newFromLink: (t: string) => `"${t}" 메모가 없습니다. 새로 만듭니다.`,
   },
   quick: {
@@ -219,6 +228,13 @@ export const ko = {
       driveNoClient: 'Google 클라이언트 ID가 설정되지 않아 Drive를 연결할 수 없습니다 (.env의 VITE_GOOGLE_CLIENT_ID).',
       driveDisconnectTitle: 'Drive 연결을 해제할까요?',
       driveDisconnectConfirm: 'Drive의 암호문은 그대로 남고, 이 기기는 로컬 전용이 됩니다.',
+      folder: '폴더',
+      folderDesc: '내 컴퓨터의 폴더에 암호문을 둡니다. 그 폴더를 Dropbox·iCloud·Syncthing 같은 도구로 옮기면 다른 기기와 동기화됩니다.',
+      folderConnect: '동기화 폴더 고르기',
+      folderOn: (name: string) => `${name} 폴더에 동기화합니다.`,
+      folderUnsupported: '이 브라우저에서는 폴더를 고를 수 없습니다. Chrome이나 Edge 데스크톱에서 됩니다.',
+      folderDisconnectTitle: '폴더 동기화를 끌까요?',
+      folderDisconnectConfirm: '폴더의 암호문은 그대로 남고, 이 기기는 로컬 전용이 됩니다.',
       pro: 'Pro 동기화',
       proPrice: '월 [가격]',
       proDesc: '실시간 반영, 첨부파일 1GB, 주간 자동 메일 백업',
@@ -312,6 +328,8 @@ export const ko = {
       sizes: { s: '작게', m: '보통', l: '크게' },
       editorWidth: '편집기 폭',
       widths: { narrow: '좁게', normal: '보통', wide: '넓게' },
+      language: '언어',
+      languages: { ko: '한국어', en: 'English' },
     },
   },
   keys: {
@@ -354,6 +372,7 @@ export const ko = {
     importState: { new: '새로 추가', changed: '값 바뀜', same: '그대로' },
     importRun: (n: number) => `${n}개 넣기`,
     imported: (a: number, u: number) => `넣었습니다. 추가 ${a}개, 값 바뀜 ${u}개.`,
+    exportMenu: '꺼내기',
     exportCopy: '.env 복사',
     download: '내려받기',
     downloadTitle: '.env 파일로 내려받을까요?',
@@ -434,7 +453,13 @@ export const ko = {
   templates: {
     meeting: { title: (d: string) => `${d} 회의`, body: '## 참석\n\n## 결정\n- \n\n## 할 일 (@이름을 붙이면 담당자)\n- [ ] \n' },
     plan: { title: (d: string) => `${d} 계획`, body: '## 오늘 꼭 할 3가지\n- [ ] \n- [ ] \n- [ ] \n\n## 루틴\n- [ ] 운동\n- [ ] 읽기\n\n## 돌아보기\n' },
+    // #복습 태그는 "다시 볼 메모"가 알아본다 (app/assist.ts REVIEW_TAGS). 영어 템플릿의 #review도 같이 알아본다.
     study: { title: (d: string) => `${d} 학습 노트`, body: '## 핵심 3줄\n- \n\n## 내 말로 설명\n\n## 스스로 묻기\n- \n\n#복습\n' },
+  },
+  // 처음 켤 때 정하는 이 기기 이름 (설정에서 바꿀 수 있다)
+  device: {
+    phone: (os: string) => `${os} 폰`,
+    pc: (os: string) => `이 PC (${os})`,
   },
   time: {
     justNow: '방금 전',
@@ -443,6 +468,52 @@ export const ko = {
     yesterday: '어제',
     date: (m: number, d: number) => `${m}월 ${d}일`,
     weekdays: ['일', '월', '화', '수', '목', '금', '토'],
+    day: (m: number, d: number, weekday: string) => `${m}월 ${d}일 (${weekday})`,
     month: (y: number, m: number) => `${y}년 ${m}월`,
   },
 } as const;
+
+/**
+ * 사전의 모양. 한국어 사전에서 뽑되 글자 그대로의 타입('취소')은 string으로 넓힌다.
+ * 함수는 인자 그대로, 배열은 길이 그대로, 숫자(자동 잠금 분)는 그대로 둔다. 영어 사전(en.ts)이 이 타입을 따른다.
+ */
+type Widen<T> = T extends (...args: infer A) => infer R
+  ? (...args: A) => Widen<R>
+  : T extends string
+    ? string
+    : T extends object
+      ? { readonly [K in keyof T]: Widen<T[K]> }
+      : T;
+export type Strings = Widen<typeof korean>;
+
+export type Lang = 'ko' | 'en';
+export const LANG_KEY = 'vault.lang';
+
+/**
+ * 언어는 모듈을 읽을 때 한 번 정한다: 설정에서 고른 값(localStorage) → 브라우저 언어가 한국어면 한국어 → 아니면 영어.
+ * 브라우저가 아닌 곳(Node에서 도는 단위 테스트)은 한국어. Node에도 navigator가 있어서 document로 가린다.
+ */
+function pickLang(): Lang {
+  if (typeof document === 'undefined') return 'ko';
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === 'ko' || saved === 'en') return saved;
+  } catch {
+    /* 저장소를 못 쓰는 환경 → 브라우저 언어로 */
+  }
+  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('ko') ? 'ko' : 'en';
+}
+
+export const lang: Lang = pickLang();
+
+/** 지금 고른 언어의 문구. 이름이 `ko`인 것은 앱 전체의 import를 그대로 두기 위해서다. */
+export const ko: Strings = lang === 'en' ? en : korean;
+
+/** 언어를 바꾼다. 문구는 모듈을 읽을 때 정해지므로 부른 쪽에서 새로 고친다. */
+export function setLang(next: Lang): void {
+  try {
+    localStorage.setItem(LANG_KEY, next);
+  } catch {
+    /* 저장하지 못하면 다음에도 브라우저 언어를 따른다 */
+  }
+}

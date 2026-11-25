@@ -1,5 +1,7 @@
-import { DriveBackend, LocalStore, MemoryBackend, SyncScheduler, VaultSession, type SyncBackend } from '@vault/core';
+import { DriveBackend, FolderBackend, LocalStore, MemoryBackend, SyncScheduler, VaultSession, type SyncBackend } from '@vault/core';
+import { browserFolderFs, folderSyncEnabled } from './folderSync';
 import { GisDriveAuth } from './driveAuth';
+import { ko } from '../i18n/ko';
 import { createSupabaseBackend, proEnabled } from '../pro/supabase';
 
 /**
@@ -44,7 +46,7 @@ function deviceIdentity(): { deviceId: string; deviceName: string } {
 export function guessDeviceName(): string {
   const ua = navigator.userAgent;
   const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : 'PC';
-  return /Android|iPhone|iPad/i.test(ua) ? `${os} 폰` : `이 PC (${os})`;
+  return /Android|iPhone|iPad/i.test(ua) ? ko.device.phone(os) : ko.device.pc(os);
 }
 
 export function setDeviceName(name: string): void {
@@ -66,6 +68,8 @@ export function createAppSession(): AppSession {
   const driveAuth = GOOGLE_CLIENT_ID ? new GisDriveAuth(GOOGLE_CLIENT_ID) : null;
   const backend: SyncBackend = proEnabled()
     ? createSupabaseBackend()
+    : folderSyncEnabled() // 사용자가 고른 폴더 (다른 동기화 도구와 같이 쓴다)
+      ? new FolderBackend({ fs: browserFolderFs() })
     : useDrive && driveAuth
       ? new DriveBackend({ auth: driveAuth })
       : new MemoryBackend();

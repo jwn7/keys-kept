@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { extractTags, envForProject, type Note } from '@vault/core';
-import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, ShareDialog, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
+import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, ExportMenu, IncidentView, ShareDialog, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
@@ -410,10 +410,14 @@ function NoteList() {
             )}
             <span className="env-bar-gap" />
             <button type="button" className="btn-link" onClick={() => setEnvImport({ text: '' })}>{ko.keys.importOpen}</button>
-            {projectHasKeys && <button type="button" className="btn-link" onClick={() => void copyEnv()}>{ko.keys.exportCopy}</button>}
-            {projectHasKeys && <button type="button" className="btn-link" onClick={() => void downloadSealedEnv(notes, project, envFilter)}>{ko.keys.sealed}</button>}
-            {projectHasKeys && <button type="button" className="btn-link" onClick={() => setSharing(true)}>{ko.keys.share.open}</button>}
-            {projectHasKeys && <button type="button" className="btn-link muted" onClick={() => void downloadProjectEnv(notes, project, envFilter)}>{ko.keys.download}</button>}
+            {projectHasKeys && (
+              <ExportMenu
+                onCopy={() => void copyEnv()}
+                onSealed={() => void downloadSealedEnv(notes, project, envFilter)}
+                onShare={() => setSharing(true)}
+                onPlain={() => void downloadProjectEnv(notes, project, envFilter)}
+              />
+            )}
           </div>
         )}
         {!noList && <div className="list-head">

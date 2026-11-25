@@ -35,6 +35,25 @@ describe('parseQuickDate', () => {
     expect(p('내일').date).toBeNull();
     expect(p('내일배움카드 신청').date).toBeNull();
   });
+
+  it('영어 날짜 말: today, tomorrow, 요일, this/next, 12/5 (대소문자 무시)', () => {
+    expect(p('tomorrow dentist at 3')).toEqual({ text: 'dentist at 3', date: '2026-11-26', word: 'tomorrow' });
+    expect(p('Ship the release Today')).toEqual({ text: 'Ship the release', date: '2026-11-25', word: 'Today' });
+    expect(p('friday team dinner').date).toBe('2026-11-27');
+    expect(p('Wednesday demo').date).toBe('2026-12-02'); // 오늘이 수요일이면 다음 주
+    expect(p('next monday weekly sync').date).toBe('2026-11-30');
+    expect(p('hiking next sunday').date).toBe('2026-12-06');
+    expect(p('submit this friday').date).toBe('2026-11-27');
+    expect(p('moving quote 12/5').date).toBe('2026-12-05');
+  });
+
+  it('영어도 문장 가운데나 낱말 일부, 줄임말은 건드리지 않는다', () => {
+    expect(p('we agreed tomorrow is fine').date).toBeNull();
+    expect(p('tomorrow').date).toBeNull();
+    expect(p('todayish plan').date).toBeNull();
+    expect(p('lunch with Sun').date).toBeNull();
+    expect(p('rotate keys next').date).toBeNull();
+  });
 });
 
 describe('openTasks / checkTask', () => {
@@ -85,5 +104,11 @@ describe('reviewDue', () => {
     const made = (id: string, day: string, tags = ['복습']) => note({ id, tags, createdAt: new Date(`${day}T12:00:00`).toISOString() });
     const notes = [made('d1', '2026-11-24'), made('d2', '2026-11-23'), made('d7', '2026-11-18'), made('d30', '2026-10-26'), made('today', '2026-11-25'), made('plain', '2026-11-24', [])];
     expect(reviewDue(notes, '2026-11-25').map((n) => n.id)).toEqual(['d1', 'd7', 'd30']);
+  });
+
+  it('영어 템플릿의 #review 태그도 같이 알아본다', () => {
+    const made = (id: string, day: string, tags: string[]) => note({ id, tags, createdAt: new Date(`${day}T12:00:00`).toISOString() });
+    const notes = [made('en', '2026-11-24', ['review']), made('ko', '2026-11-22', ['복습']), made('other', '2026-11-24', ['reviewed'])];
+    expect(reviewDue(notes, '2026-11-25').map((n) => n.id)).toEqual(['en', 'ko']);
   });
 });

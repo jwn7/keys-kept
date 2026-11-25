@@ -39,11 +39,10 @@ export function monthGrid(year: number, month: number): string[] {
   return Array.from({ length: 42 }, (_, i) => dayKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
 }
 
-/** `2026-11-24` → `11월 24일 (화)` */
+/** `2026-11-24` → `11월 24일 (화)` (영어: `Tue, Nov 24`) */
 export function formatDay(key: string): string {
   const [y, m, d] = key.split('-').map(Number) as [number, number, number];
-  const w = ko.time.weekdays[new Date(y, m - 1, d).getDay()];
-  return `${m}월 ${d}일 (${w})`;
+  return ko.time.day(m, d, ko.time.weekdays[new Date(y, m - 1, d).getDay()]!);
 }
 
 export function todayTitle(d = new Date()): string {

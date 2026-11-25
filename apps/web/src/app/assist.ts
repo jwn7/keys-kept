@@ -9,23 +9,31 @@ import { dayKey } from './util';
 // ---------- 1. 빠른 메모의 날짜 말 ("내일 치과 3시") ----------
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-const DATE_WORD = String.raw`오늘|내일|모레|(?:(?:이번|다음)\s?주\s?)?[일월화수목금토]요일|\d{1,2}월\s?\d{1,2}일|\d{1,2}\/\d{1,2}`;
-const AT_START = new RegExp(`^(${DATE_WORD})\\s+(.+)$`);
-const AT_END = new RegExp(`^(.+?)\\s+(${DATE_WORD})$`);
+// 영어 날짜 말도 같이 알아본다 (화면 언어와 무관, 대소문자 무시). 요일은 줄임말(sun, sat) 없이 온전한 이름만: 사람 이름·다른 낱말과 헷갈리지 않게.
+const EN_WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const EN_WEEKDAY_RE = new RegExp(`^(?:(this|next)\\s+)?(${EN_WEEKDAYS.join('|')})$`);
+const EN_DATE_WORD = String.raw`today|tomorrow|(?:(?:this|next)\s+)?(?:${EN_WEEKDAYS.join('|')})`;
+const DATE_WORD = String.raw`${EN_DATE_WORD}|오늘|내일|모레|(?:(?:이번|다음)\s?주\s?)?[일월화수목금토]요일|\d{1,2}월\s?\d{1,2}일|\d{1,2}\/\d{1,2}`;
+const AT_START = new RegExp(`^(${DATE_WORD})\\s+(.+)$`, 'i');
+const AT_END = new RegExp(`^(.+?)\\s+(${DATE_WORD})$`, 'i');
 
-function resolveDateWord(word: string, now: Date): string | null {
+function resolveDateWord(raw: string, now: Date): string | null {
   const at = (offset: number) => dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset));
-  if (word === '오늘') return at(0);
-  if (word === '내일') return at(1);
+  /** 요일(0 = 일요일)을 날짜로. week가 없으면 다가오는 그 요일, 있으면 월요일에 시작하는 이번 주·다음 주의 그 요일. */
+  const weekday = (week: 'this' | 'next' | null, target: number) => {
+    const dow = now.getDay();
+    if (!week) return at((target - dow + 7) % 7 || 7); // "금요일" = 다가오는 금요일 (오늘이 금요일이면 다음 주)
+    const monday = -((dow + 6) % 7); // 한 주는 월요일에 시작한다
+    return at(monday + ((target + 6) % 7) + (week === 'next' ? 7 : 0));
+  };
+  const word = raw.toLowerCase();
+  if (word === '오늘' || word === 'today') return at(0);
+  if (word === '내일' || word === 'tomorrow') return at(1);
   if (word === '모레') return at(2);
   const wd = /^(?:(이번|다음)\s?주\s?)?([일월화수목금토])요일$/.exec(word);
-  if (wd) {
-    const target = WEEKDAYS.indexOf(wd[2]!);
-    const dow = now.getDay();
-    if (!wd[1]) return at((target - dow + 7) % 7 || 7); // "금요일" = 다가오는 금요일 (오늘이 금요일이면 다음 주)
-    const monday = -((dow + 6) % 7); // 한 주는 월요일에 시작한다
-    return at(monday + ((target + 6) % 7) + (wd[1] === '다음' ? 7 : 0));
-  }
+  if (wd) return weekday(wd[1] ? (wd[1] === '다음' ? 'next' : 'this') : null, WEEKDAYS.indexOf(wd[2]!));
+  const en = EN_WEEKDAY_RE.exec(word.replace(/\s+/g, ' '));
+  if (en) return weekday((en[1] as 'this' | 'next' | undefined) ?? null, EN_WEEKDAYS.indexOf(en[2]!));
   const md = /^(\d{1,2})월\s?(\d{1,2})일$/.exec(word) ?? /^(\d{1,2})\/(\d{1,2})$/.exec(word);
   if (md) {
     const m = Number(md[1]);
@@ -120,6 +128,8 @@ export function relatedNotes(note: Note, notes: Note[], max = 3): Note[] {
 // ---------- 4. 다시 볼 메모 (간격 복습) ----------
 
 export const REVIEW_TAG = '복습';
+/** 영어 학습 노트 템플릿은 #review를 붙인다 (i18n/en.ts). 둘 다 알아본다: 언어를 바꿔도 예전 메모가 계속 나오게. */
+export const REVIEW_TAGS = [REVIEW_TAG, 'review'];
 /** 쓴 날로부터 며칠 뒤에 다시 보여줄지. 잊기 직전에 다시 보면 오래 남는다(간격 반복). */
 export const REVIEW_DAYS = [1, 3, 7, 14, 30];
 
@@ -130,5 +140,5 @@ const dayNumber = (key: string) => {
 
 export function reviewDue(notes: Note[], today: string): Note[] {
   const t = dayNumber(today);
-  return notes.filter((n) => n.tags.includes(REVIEW_TAG) && REVIEW_DAYS.includes(t - dayNumber(dayKey(new Date(n.createdAt)))));
+  return notes.filter((n) => n.tags.some((tag) => REVIEW_TAGS.includes(tag)) && REVIEW_DAYS.includes(t - dayNumber(dayKey(new Date(n.createdAt)))));
 }
