@@ -1,10 +1,20 @@
 # Vault (가칭)
 
-개발자도 못 보는 메모장. 기기에서 잠그고(Argon2id + XChaCha20-Poly1305), 내 Google Drive로 PC·폰 동기화, 백업은 표준 age 파일.
+1인 개발자와 바이브코더를 위한 **키 장부**. API 키, 환경변수, 계정 정보를 메모장에 적어 두는 대신 기기에서 잠가 보관하고, 어디에 쓰이는지·언제 끝나는지·털리면 뭘 바꿔야 하는지를 같이 관리한다.
+
+- 키를 붙여 넣으면 어느 서비스의 무슨 키인지 알아보고, 브라우저에 공개되는 이름(`NEXT_PUBLIC_`, `VITE_`)에 비밀 키를 넣으면 경고한다.
+- 꺼내 쓰기: `Ctrl+K` → 이름 → Enter로 복사. `.env` 통째로 넣고 꺼내기.
+- 평문 `.env` 없이 실행: `vault-run -- npm run dev` (`packages/env`).
+- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버, `packages/env`).
+- 사고 모드: 털린 기기나 프로젝트를 고르면 바꿔야 할 키 체크리스트가 나온다.
+- 기기에서 암호화(Argon2id + XChaCha20-Poly1305), 회사 서버 없이 내 Google Drive에 암호문만, 백업은 표준 age 파일.
+
+> **외부 보안 검토를 받지 않았다.** 잃거나 새도 다시 발급할 수 있는 키만 넣을 것. 한계는 `docs/SECURITY.md`.
 
 ## 이 저장소의 상태
-0~6단계 코드 완료(테스트 94개). 외부 작업(OAuth 등록, Supabase 배포, Android 빌드, Play 등록)만 남음. 문서는 다음 순서로 읽는다.
+키 장부의 계획 1~6단계 완료(core 136, web 35, env 7, 화면 흐름 17). 남은 것은 외부 작업(OAuth 등록, Android 빌드, 스토어 등록)과 다국어. 문서는 다음 순서로 읽는다.
 
+0. `docs/STRATEGY.md` — 무엇을 만드는가, 계획, 보류한 것 (방향은 이 문서가 정한다)
 1. `CLAUDE.md` — 작업 규칙 (먼저 읽기)
 2. `docs/SPEC.md` — 제품 스펙
 3. `docs/DATA-MODEL.md` — 키 계층·타입·백엔드 파일/테이블 구조
@@ -18,7 +28,7 @@
 ## 시작하기
 ```bash
 pnpm i
-pnpm -r test            # core 89개 + web 5개
+pnpm -r test            # core + web + env
 pnpm --filter web dev   # http://localhost:5173
 ```
 - 처음 실행하면 마스터 비밀번호를 정하고 복구 키 12단어를 받는다. 기본은 **로컬 전용**(IndexedDB에 암호문만).

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { detectKey, isConflictCopy, isSecret, parseEnv, type Note } from '@vault/core';
+import { detectKey, isConflictCopy, isSecret, parseEnv, secretIssues, type Note } from '@vault/core';
 import { KeyRow } from './KeyViews';
 import { flushEditor, useApp } from '../app/store';
 import { checkTask, openTasks, parseQuickDate, reviewDue, type Task } from '../app/assist';
@@ -183,6 +183,22 @@ function upcomingGroups(byDay: Map<string, Note[]>, today: string, skip: string 
 const MAX_TASKS = 8;
 
 /**
+ * 첫 화면의 묶음 하나. TodayView 안에서 정의하면 다시 그려질 때마다 줄들이 새로 만들어져,
+ * 입력 칸에서 벗어나며 저장이 일어나는 순간의 클릭이 사라진다 (사이드바 Item과 같은 문제). 그래서 바깥에 둔다.
+ */
+function Group({ label, list, now }: { label: string; list: Note[]; now: number }) {
+  if (list.length === 0) return null;
+  return (
+    <section aria-label={label}>
+      <h2 className="label agenda-label">{label}</h2>
+      {list.map((n) => (
+        <NoteRow key={n.id} n={n} now={now} />
+      ))}
+    </section>
+  );
+}
+
+/**
  * 오늘 화면: 열자마자 "오늘 뭐가 있고, 뭘 해야 하고, 뭘 다시 봐야 하나"가 보이게 한다.
  * 한 메모는 한 묶음에만 나온다 (위 묶음이 우선).
  */
@@ -195,12 +211,19 @@ export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }
   const v = useMemo(() => {
     const byDay = new Map<string, Note[]>();
     for (const n of notes) {
+      if (isSecret(n)) continue; // 키의 날짜는 만료일이다. 일정이 아니라 '지금 살펴볼 키'에서 본다
       const k = noteDay(n, 'date');
       if (k) byDay.set(k, [...(byDay.get(k) ?? []), n]);
     }
+    // 공개될 수 있는 키가 먼저, 그다음 만료가 가까운 순
+    const attention = notes
+      .filter((n) => secretIssues(n, today).length > 0)
+      .sort((a, b) => Number(secretIssues(b, today).includes('public-name')) - Number(secretIssues(a, today).includes('public-name')) || (a.date ?? '9').localeCompare(b.date ?? '9'));
+    const noPlace = notes.filter((n) => isSecret(n) && n.secret.usedIn.length === 0).length;
+    const hasKeys = notes.some(isSecret);
     const todays = byDay.get(today) ?? [];
     const upcoming = upcomingGroups(byDay, today, today, 8);
-    const shown = new Set([...todays, ...upcoming.flatMap(([, items]) => items)].map((n) => n.id));
+    const shown = new Set([...attention, ...todays, ...upcoming.flatMap(([, items]) => items)].map((n) => n.id));
     const take = (list: Note[]) => {
       const out = list.filter((n) => !shown.has(n.id));
       for (const n of out) shown.add(n.id);
@@ -209,7 +232,7 @@ export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }
     const review = take(reviewDue(notes, today));
     const pinned = take(notes.filter((n) => n.pinned));
     const recent = take([...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter((n) => !shown.has(n.id)).slice(0, 6));
-    return { todays, upcoming, review, pinned, recent, tasks: openTasks(notes), rest: notes.length - shown.size };
+    return { attention, noPlace, hasKeys, todays, upcoming, review, pinned, recent, tasks: openTasks(notes), rest: notes.length - shown.size };
   }, [notes, today]);
   const [ty, tm, td] = today.split('-').map(Number) as [number, number, number];
   const tomorrow = dayKey(new Date(ty, tm - 1, td + 1));
@@ -221,15 +244,6 @@ export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }
     await app.session.save({ id: cur.id, body: checkTask(cur.body, t.line) });
     if (app.backendKind !== 'memory') app.scheduler.requestNow();
   };
-  const Group = ({ label, list }: { label: string; list: Note[] }) =>
-    list.length === 0 ? null : (
-      <section aria-label={label}>
-        <h2 className="label agenda-label">{label}</h2>
-        {list.map((n) => (
-          <NoteRow key={n.id} n={n} now={now} />
-        ))}
-      </section>
-    );
 
   return (
     <div className="today">
@@ -237,10 +251,24 @@ export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }
         <span>{formatDay(today)}</span>
         <button type="button" className="btn-link" onClick={onDaily} title="Ctrl+D">{ko.main.today}</button>
       </div>
-      <section aria-label={ko.main.todaySchedule}>
-        <h2 className="label agenda-label">{ko.main.todaySchedule}</h2>
-        {v.todays.length === 0 ? <p className="agenda-empty">{ko.cal.emptyDay}</p> : v.todays.map((n) => <NoteRow key={n.id} n={n} now={now} hideDate />)}
-      </section>
+      {v.hasKeys && (
+        <section aria-label={ko.keys.attention}>
+          <h2 className="label agenda-label">{ko.keys.attention}</h2>
+          {v.attention.length === 0 ? <p className="agenda-empty">{ko.keys.allClear}</p> : v.attention.map((n) => <NoteRow key={n.id} n={n} now={now} />)}
+          {v.noPlace > 0 && (
+            <p className="agenda-empty no-place">
+              <button type="button" className="btn-link" onClick={() => setFilter({ kind: 'keys' })}>{ko.keys.noPlace(v.noPlace)}</button> {ko.keys.noPlaceHint}
+            </p>
+          )}
+        </section>
+      )}
+      {/* 키 장부로 쓰는 사람에게 "일정이 없습니다"는 소음이다. 일정이 있거나 키가 하나도 없을 때만 보인다 */}
+      {(v.todays.length > 0 || !v.hasKeys) && (
+        <section aria-label={ko.main.todaySchedule}>
+          <h2 className="label agenda-label">{ko.main.todaySchedule}</h2>
+          {v.todays.length === 0 ? <p className="agenda-empty">{ko.cal.emptyDay}</p> : v.todays.map((n) => <NoteRow key={n.id} n={n} now={now} hideDate />)}
+        </section>
+      )}
       {v.tasks.length > 0 && (
         <section aria-label={ko.main.tasks}>
           <h2 className="label agenda-label">{ko.main.tasks}</h2>
@@ -271,9 +299,9 @@ export function TodayView({ now, onDaily }: { now: number; onDaily: () => void }
           ))}
         </section>
       )}
-      <Group label={ko.main.review} list={v.review} />
-      <Group label={ko.main.pinnedSection} list={v.pinned} />
-      <Group label={ko.main.recent} list={v.recent} />
+      <Group label={ko.main.review} list={v.review} now={now} />
+      <Group label={ko.main.pinnedSection} list={v.pinned} now={now} />
+      <Group label={ko.main.recent} list={v.recent} now={now} />
       {v.rest > 0 && (
         <button type="button" className="btn-link muted agenda-undated" onClick={() => setFilter({ kind: 'all' })}>{ko.main.seeAll(notes.length)}</button>
       )}

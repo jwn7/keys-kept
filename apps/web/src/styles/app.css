@@ -472,3 +472,20 @@ button.chip:hover { background: var(--line); color: var(--ink); }
   .secret-value input { flex-basis: 100%; height: 48px; }
   .secret-value .btn { flex: 1; min-height: 48px; }
 }
+
+/* ---- 첫 화면의 살펴볼 키, 사고 모드 ---- */
+.no-place { padding-top: 8px; }
+.incident { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 24px; }
+.incident-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 12px 8px; font-size: 13px; }
+.incident-pick .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.incident-progress { display: flex; align-items: baseline; gap: 12px; padding: 10px 12px 4px; font-size: 13px; }
+.incident-progress strong { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.incident-bar { height: 6px; border-radius: 999px; background: var(--fill); margin: 0 12px 10px; overflow: hidden; }
+.incident-bar i { display: block; height: 100%; background: var(--ink); transition: width var(--motion); }
+.incident-row { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: var(--radius-m); min-height: 52px; }
+.incident-row:hover { background: var(--fill-hover); }
+.incident-row input, .incident-box { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+.incident-box { box-sizing: border-box; border: 1.5px dashed var(--line-strong); border-radius: 5px; }
+.incident-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; border: 0; background: none; text-align: left; padding: 8px 0; }
+.incident-row.done .key-name { text-decoration: line-through; color: var(--muted); }
+.incident-unknown { padding-top: 16px; }

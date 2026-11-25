@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { detectKey, envAgeFileName, formatEnv, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
+import { compromisedBy, detectKey, envAgeFileName, formatEnv, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
 import { useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
@@ -100,6 +100,9 @@ export function KeyRow({ n }: { n: Note & { secret: SecretInfo } }) {
 /**
  * 편집기 안의 키 칸: 값(가려서, 보기·복사), 환경, 쓰이는 곳. 이름은 편집기의 제목 칸, 만료일은 날짜 칩, 설명은 본문이다.
  * 값은 입력을 멈추고 0.6초 뒤, 또는 칸을 벗어날 때 저장한다.
+ *
+ * 반드시 `key={note.id}`로 쓴다: 키마다 새로 만들어져야 한다. 한 인스턴스가 키 A에서 B로 바뀌면
+ * 정리 함수가 "A에서 치던 값"을 B에 저장해 B의 값을 덮어쓴다 (실제로 있었던 버그, e2e/keys.spec.ts가 지킨다).
  */
 export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
   const app = useApp((s) => s.app);
@@ -111,12 +114,12 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
   const latest = useRef({ note, value, env });
   latest.current = { note, value, env };
 
-  // 다른 키로 바꾸면 그 키의 값으로, 다시 가린다
+  // 다른 기기에서 값이 바뀌어 들어오면 받아들인다. 내가 입력 중(저장 대기)일 때는 건드리지 않는다
   useEffect(() => {
+    if (timer.current) return;
     setValue(note.secret.value);
     setEnv(note.secret.env ?? '');
-    setShow(false);
-  }, [note.id]);
+  }, [note.secret.value, note.secret.env]);
 
   const save = (patch: Partial<SecretInfo>) => {
     const cur = latest.current.note;
@@ -135,7 +138,7 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, 600);
   };
-  useEffect(() => () => flush(), [note.id]); // 다른 키로 가거나 닫을 때 남은 입력을 저장
+  useEffect(() => () => flush(), []); // 닫히거나 다른 키로 갈 때(= 이 인스턴스가 사라질 때) 남은 입력을 저장
 
   const today = dayKey(new Date());
   const d = useMemo(() => detectKey(value), [value]);
@@ -333,4 +336,95 @@ export async function downloadProjectEnv(notes: Note[], project: string | null, 
   const ok = await ui.confirm({ title: K.downloadTitle, body: K.downloadWarn, confirmLabel: K.download, danger: true });
   if (!ok) return;
   downloadBytes(r.env ? `.env.${r.env}` : '.env', new TextEncoder().encode(r.text));
+}
+
+// ---------- 사고 모드 ----------
+
+/**
+ * "이 기기가 털렸다" 또는 "이 프로젝트가 새어 나갔다"를 고르면 바꿔야 할 키만 체크리스트로 뽑는다.
+ * 값을 바꾸면 스스로 체크되고, 손으로 체크할 수도 있다. 쓰이는 곳을 안 적은 키는 "모름"으로 따로 보여준다.
+ */
+export function IncidentView() {
+  const notes = useApp((s) => s.notes);
+  const incident = useApp((s) => s.incident);
+  const setIncident = useApp((s) => s.setIncident);
+  const select = useApp((s) => s.select);
+  const I = ko.incident;
+  const places = useMemo(() => placesUsed(notes), [notes]);
+  const projects = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const n of notes) if (isSecret(n) && n.folder) m.set(n.folder, (m.get(n.folder) ?? 0) + 1);
+    return [...m.entries()];
+  }, [notes]);
+
+  const start = (by: { place: string } | { project: string | null }) => {
+    const { affected } = compromisedBy(notes, by);
+    setIncident({ by, initial: Object.fromEntries(affected.map((n) => [n.id, n.secret.value])), done: [] });
+  };
+  const sameBy = (by: { place: string } | { project: string | null }) => JSON.stringify(incident?.by) === JSON.stringify(by);
+
+  const chips = (
+    <div className="incident-pick">
+      <span className="muted">{I.ask}</span>
+      {places.map((p) => (
+        <button key={`p:${p.place}`} type="button" className="chip" aria-pressed={sameBy({ place: p.place })} onClick={() => start({ place: p.place })}>{I.place(p.place, p.count)}</button>
+      ))}
+      {projects.map(([p, c]) => (
+        <button key={`f:${p}`} type="button" className="chip" aria-pressed={sameBy({ project: p })} onClick={() => start({ project: p })}>{I.projectChip(p, c)}</button>
+      ))}
+    </div>
+  );
+
+  if (places.length === 0 && projects.length === 0) return <div className="incident"><p className="agenda-empty">{I.empty}</p></div>;
+  if (!incident) return <div className="incident">{chips}<p className="agenda-empty">{I.pick}</p></div>;
+
+  const { affected, unknown } = compromisedBy(notes, incident.by);
+  // 시작할 때 목록에 있던 키만 센다 (도중에 새로 만든 키가 끼어들지 않게)
+  const list = affected.filter((n) => n.id in incident.initial);
+  const isDone = (n: Note & { secret: SecretInfo }) => incident.done.includes(n.id) || n.secret.value !== incident.initial[n.id];
+  const doneCount = list.filter(isDone).length;
+  const what = 'place' in incident.by ? incident.by.place : (incident.by.project ?? '');
+  const toggle = (id: string) => setIncident({ ...incident, done: incident.done.includes(id) ? incident.done.filter((x) => x !== id) : [...incident.done, id] });
+
+  return (
+    <div className="incident">
+      {chips}
+      <div className="incident-progress">
+        <strong>{I.progress(doneCount, list.length)}</strong>
+        <span className="muted">{list.length > 0 && doneCount === list.length ? I.allDone : I.progressLabel(what)}</span>
+      </div>
+      <div className="incident-bar" role="progressbar" aria-valuemin={0} aria-valuemax={list.length} aria-valuenow={doneCount}>
+        <i style={{ width: `${list.length ? (doneCount / list.length) * 100 : 0}%` }} />
+      </div>
+      {list.map((n) => {
+        const d = detectKey(n.secret.value);
+        const changed = n.secret.value !== incident.initial[n.id];
+        return (
+          <div key={n.id} className={`incident-row${isDone(n) ? ' done' : ''}`}>
+            <input type="checkbox" checked={isDone(n)} disabled={changed} aria-label={I.done(n.title || K.unnamed)} onChange={() => toggle(n.id)} />
+            <button type="button" className="incident-main" onClick={() => select(n.id)} title={I.open}>
+              <span className="key-name"><span>{n.title || K.unnamed}</span></span>
+              <span className="key-sub">{[n.folder, n.secret.env, d ? d.provider : K.unknownKind, d?.mode === 'live' ? K.mode.live : null].filter(Boolean).join(' · ')}</span>
+            </button>
+            {changed ? <span className="key-chip ok">{I.changed}</span> : d?.rotateUrl ? <a href={d.rotateUrl} target="_blank" rel="noopener noreferrer" className="rotate-link">{K.rotate}</a> : null}
+          </div>
+        );
+      })}
+      {unknown.length > 0 && (
+        <>
+          <div className="label agenda-label incident-unknown">{I.unknown(unknown.length)}</div>
+          {unknown.map((n) => (
+            <div key={n.id} className="incident-row">
+              <span className="incident-box" aria-hidden="true" />
+              <button type="button" className="incident-main" onClick={() => select(n.id)}>
+                <span className="key-name"><span>{n.title || K.unnamed}</span></span>
+                <span className="key-sub">{n.folder ?? ''}</span>
+              </button>
+              <span className="key-chip">{I.unknownChip}</span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
 }

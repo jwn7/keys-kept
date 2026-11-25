@@ -242,7 +242,7 @@ export function Editor() {
             </>
           )}
         </div>
-        {isSecret(note) && !inTrash && <SecretPanel note={note} />}
+        {isSecret(note) && !inTrash && <SecretPanel key={note.id} note={note} />}
         <div className="editor-body" ref={hostRef} />
         {!inTrash && (
           <div className="mobile-toolbar">

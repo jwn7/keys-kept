@@ -58,7 +58,7 @@ const browser = await chromium.launch({ channel: 'chrome' });
   await page.goto('http://localhost:5173/');
   await shot(page, 'pc-1-setup');
   await seed(page);
-  await page.locator('.sidebar').getByRole('button', { name: '오늘' }).first().click();
+  await page.locator('.sidebar').getByRole('button', { name: '살펴볼 것' }).first().click();
   await shot(page, 'pc-0-today');
   await page.locator('.note-row', { hasText: '주간 회의' }).click();
   await page.getByRole('button', { name: '더 보기' }).click();

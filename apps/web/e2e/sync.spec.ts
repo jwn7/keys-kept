@@ -82,7 +82,7 @@ async function unlock(page: Page) {
   await expect(page.getByRole('heading', { name: '잠금 해제' })).toBeVisible();
   await page.locator('#pw').fill(PASSWORD);
   await page.getByRole('button', { name: '열기', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible(); // 첫 화면은 오늘
+  await expect(page.getByRole('heading', { name: '살펴볼 것' })).toBeVisible(); // 첫 화면
 }
 const synced = (page: Page) => expect(page.locator('.sidebar .badge')).toContainText('동기화됨');
 

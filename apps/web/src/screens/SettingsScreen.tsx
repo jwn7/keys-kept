@@ -333,6 +333,7 @@ function SecuritySection() {
   return (
     <section id="security" className="card">
       <h2>{S.nav.security}</h2>
+      <p className="small muted unreviewed">{S.security.unreviewed}</p>
       <div className="row">
         <span>{S.security.autoLock}</span>
         <div className="segment" role="group" aria-label={S.security.autoLock}>

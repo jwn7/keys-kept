@@ -7,7 +7,7 @@ import { markOpen } from './metrics';
 import { ui } from './ui';
 import { ko } from '../i18n/ko';
 
-export type Filter = { kind: 'today' } | { kind: 'keys' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
+export type Filter = { kind: 'today' } | { kind: 'keys' } | { kind: 'incident' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
 export type SortKey = 'updated' | 'created' | 'title';
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 's' | 'm' | 'l';
@@ -51,6 +51,11 @@ export type AppState = Prefs & {
   editing: boolean;
   /** 키 목록에서 고른 환경 (null = 전체) */
   envFilter: string | null;
+  /**
+   * 진행 중인 사고 대응. initial은 시작할 때의 값(바뀌었는지 보려고 메모리에만 둔다), done은 손으로 체크한 것.
+   * 잠그면 사라진다: 값을 디스크에 남기지 않는다.
+   */
+  incident: { by: { place: string } | { project: string | null }; initial: Record<string, string>; done: string[] } | null;
   /** .env 넣기 창. text는 붙여 넣은 내용(없으면 빈 창) */
   envImport: { text: string } | null;
   /** 캘린더가 보여주는 달 `YYYY-MM`과 고른 날 */
@@ -67,6 +72,7 @@ export type AppState = Prefs & {
   setEditing(v: boolean): void;
   setEnvFilter(e: string | null): void;
   setEnvImport(v: { text: string } | null): void;
+  setIncident(v: AppState['incident']): void;
   setCal(c: { month?: string; day?: string | null }): void;
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void;
   setLastBackup(at: string): void;
@@ -89,7 +95,7 @@ export const useApp = create<AppState>((set, get) => {
     else if (e.type === 'lock') {
       // setup 화면은 복구 문구를 보여준 뒤 스스로 main으로 넘어간다.
       const screen = e.locked ? 'unlock' : get().screen === 'setup' ? 'setup' : 'main';
-      set({ ...pull(), screen, selectedId: e.locked ? null : get().selectedId, paletteOpen: false });
+      set({ ...pull(), screen, selectedId: e.locked ? null : get().selectedId, paletteOpen: false, ...(e.locked ? { incident: null, envImport: null } : {}) });
       if (e.locked) app.scheduler.stop();
       else {
         markOpen();
@@ -126,6 +132,7 @@ export const useApp = create<AppState>((set, get) => {
     editing: false,
     envFilter: null,
     envImport: null,
+    incident: null,
     calMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
     calDay: null,
     lastBackupAt: last,
@@ -138,6 +145,7 @@ export const useApp = create<AppState>((set, get) => {
     setEditing: (editing) => set({ editing }),
     setEnvFilter: (envFilter) => set({ envFilter }),
     setEnvImport: (envImport) => set({ envImport }),
+    setIncident: (incident) => set({ incident }),
     setCal: ({ month, day }) => set((s) => ({ calMonth: month ?? (day ? day.slice(0, 7) : s.calMonth), calDay: day !== undefined ? day : s.calDay })),
     setPref: (k, v) => {
       set({ [k]: v } as Partial<AppState>);

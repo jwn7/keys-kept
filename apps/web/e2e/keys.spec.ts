@@ -16,7 +16,7 @@ async function setup(page: Page) {
   await expect(create).toBeEnabled();
   await create.click();
   await page.getByRole('button', { name: '적어두었습니다' }).click();
-  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '살펴볼 것' })).toBeVisible();
 }
 const clipboard = (page: Page) => page.evaluate(() => navigator.clipboard.readText());
 
@@ -60,6 +60,32 @@ test('키 넣기: NAME=value 한 줄 → 어느 서비스의 키인지 알아보
   await page.getByRole('menuitem', { name: '서버가 보는 모습' }).click();
   await expect(page.locator('.proof-raw')).toContainText('"ciphertext"');
   await expect(page.locator('.proof-raw')).not.toContainText('OPENAI');
+});
+
+test('키를 차례로 열어도 값이 서로 섞이지 않는다 (열었던 키의 값이 다음 키에 저장되던 버그)', async ({ page }) => {
+  await setup(page);
+  const GITHUB = ['gh', 'p_', 'e'.repeat(36)].join('');
+  const quick = page.getByLabel('빠른 메모');
+  for (const line of [`OPENAI_API_KEY=${OPENAI}`, `GITHUB_TOKEN=${GITHUB}`, 'DATABASE_URL=postgres://u:p@host/db']) {
+    await quick.fill(line);
+    await quick.press('Enter');
+  }
+  await expect(page.locator('.key-row')).toHaveCount(3);
+  const value = page.getByLabel('값', { exact: true });
+  // 열고, 값 칸을 건드리고(포커스), 다음 키로 넘어가기를 되풀이한다
+  for (const name of ['OPENAI_API_KEY', 'GITHUB_TOKEN', 'DATABASE_URL', 'OPENAI_API_KEY', 'GITHUB_TOKEN']) {
+    await page.locator('.key-row', { hasText: name }).locator('.key-main').click();
+    await expect(page.locator('.editor-title')).toHaveValue(name);
+    await value.click();
+  }
+  await page.locator('.sidebar').getByRole('button', { name: '모든 키' }).click();
+  await expect(page.locator('.key-row', { hasText: 'OPENAI_API_KEY' })).toContainText('OpenAI');
+  await expect(page.locator('.key-row', { hasText: 'GITHUB_TOKEN' })).toContainText('GitHub');
+  await expect(page.locator('.key-row', { hasText: 'DATABASE_URL' })).toContainText('알 수 없는 종류');
+  for (const [name, expected] of [['OPENAI_API_KEY', OPENAI], ['GITHUB_TOKEN', GITHUB], ['DATABASE_URL', 'postgres://u:p@host/db']] as const) {
+    await page.locator('.key-row', { hasText: name }).locator('.key-main').click();
+    await expect(value).toHaveValue(expected);
+  }
 });
 
 test('꺼내 쓰기: Ctrl+K → 이름 → Enter로 값 복사, Shift+Enter로 이름=값 복사', async ({ page }) => {
@@ -120,4 +146,45 @@ test('.env 넣기: 항목으로 나누고, 공개되는 이름에 비밀 키가 
     `NEXT_PUBLIC_SUPABASE_KEY=${SERVICE_ROLE}`,
     `OPENAI_API_KEY=${OPENAI}`,
   ]);
+});
+
+test('살펴볼 것과 사고 모드: 경고가 있는 키가 첫 화면에 오르고, 털린 곳을 고르면 바꿀 키만 뽑는다', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: '.env 넣기' }).click();
+  const dialog = page.getByRole('dialog', { name: '.env 넣기' });
+  await dialog.getByPlaceholder('프로젝트 이름').fill('shop');
+  await dialog.getByRole('textbox', { name: '.env 내용을 붙여 넣으세요' }).fill([`OPENAI_API_KEY=${OPENAI}`, `NEXT_PUBLIC_SUPABASE_KEY=${SERVICE_ROLE}`, 'DATABASE_URL=postgres://u:p@host/db'].join('\n'));
+  await dialog.getByRole('button', { name: '3개 넣기' }).click();
+  await expect(page.locator('.key-row')).toHaveCount(3);
+
+  // 첫 화면: 공개될 수 있는 키가 맨 위에, 쓰이는 곳을 안 적은 키 수
+  await page.locator('.sidebar').getByRole('button', { name: '살펴볼 것' }).click();
+  const attention = page.getByRole('region', { name: '지금 살펴볼 키' });
+  await expect(attention.locator('.key-row')).toHaveCount(1);
+  await expect(attention.locator('.key-row')).toContainText('NEXT_PUBLIC_SUPABASE_KEY');
+  await expect(attention).toContainText('쓰이는 곳을 안 적은 키 3개');
+
+  // OPENAI 키가 맥북에 있다고 적는다
+  await page.locator('.key-row', { hasText: 'OPENAI_API_KEY' }).locator('.key-main').click();
+  await page.locator('.secret-places').getByRole('button', { name: '+ 추가' }).click();
+  await page.getByRole('alertdialog').getByLabel('기기나 서비스 이름 (예: 맥북, Vercel)').fill('맥북');
+  await page.getByRole('alertdialog').getByRole('button', { name: '추가' }).click();
+  await expect(page.locator('.secret-places')).toContainText('맥북');
+
+  // 사고 모드: 맥북이 털렸다 → 맥북에 있던 키 1개, 나머지 2개는 "모름"
+  await page.locator('.sidebar').getByRole('button', { name: '사고 모드' }).click();
+  await expect(page.getByRole('heading', { name: '사고 모드' })).toBeVisible();
+  await page.locator('.incident-pick').getByRole('button', { name: '맥북 · 1' }).click();
+  await expect(page.locator('.incident-progress')).toContainText('0 / 1');
+  await expect(page.locator('.incident')).toContainText('쓰이는 곳을 안 적은 키 2개');
+  await expect(page.locator('.incident-row', { hasText: 'OPENAI_API_KEY' }).getByRole('link', { name: '재발급 페이지' })).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
+
+  // 새 값으로 바꾸면 스스로 체크된다
+  await page.locator('.incident-row', { hasText: 'OPENAI_API_KEY' }).locator('.incident-main').click();
+  const value = page.getByLabel('값', { exact: true });
+  await value.fill(['sk-', 'proj-', 'n'.repeat(48)].join(''));
+  await value.press('Tab');
+  await expect(page.locator('.incident-progress')).toContainText('1 / 1');
+  await expect(page.locator('.incident-row', { hasText: 'OPENAI_API_KEY' })).toContainText('값을 바꿈');
+  await expect(page.locator('.incident-progress')).toContainText('전부 바꿨습니다.');
 });

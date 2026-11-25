@@ -12,7 +12,7 @@ async function setup(page: Page) {
   await create.click();
   await expect(page.locator('.phrase-grid span')).toHaveCount(12);
   await page.getByRole('button', { name: '적어두었습니다' }).click();
-  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible(); // 첫 화면은 오늘
+  await expect(page.getByRole('heading', { name: '살펴볼 것' })).toBeVisible(); // 첫 화면
 }
 
 async function unlock(page: Page, password = PASSWORD) {

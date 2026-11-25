@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { extractTags, envForProject, type Note } from '@vault/core';
-import { copySecret, downloadProjectEnv, downloadSealedEnv, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
+import { copySecret, downloadProjectEnv, downloadSealedEnv, IncidentView, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
 import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
 import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
 import { StatusBadge } from '../components/StatusBadge';
-import { BackIcon, CalendarIcon, FolderIcon, GearIcon, KeyIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
+import { AlertIcon, BackIcon, CalendarIcon, FolderIcon, GearIcon, KeyIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
 import { CalendarView, CardGrid, NoteRow, QuickAdd, TodayView } from './NoteViews';
 import { markCapture } from '../app/metrics';
 import { Logo } from '../components/Seal';
@@ -27,6 +27,9 @@ export function useFilteredNotes(): Note[] {
         break;
       case 'keys':
         list = notes.filter((n) => !!n.secret);
+        break;
+      case 'incident':
+        list = [];
         break;
       case 'all': // 메모만. 키는 '모든 키'와 프로젝트에서 본다
         list = notes.filter((n) => !n.secret);
@@ -121,7 +124,7 @@ export function MainScreen() {
   const selectedId = useApp((s) => s.selectedId);
   const editing = useApp((s) => s.editing);
   const view = useApp((s) => s.view);
-  const isToday = useApp((s) => s.filter.kind === 'today');
+  const isToday = useApp((s) => s.filter.kind === 'today' || s.filter.kind === 'incident');
   const actions = useNoteActions();
 
   // 전역 단축키 (SPEC §2.3)
@@ -292,6 +295,7 @@ function Sidebar() {
         <Item key={t} f={{ kind: 'tag', tag: t }} label={t} count={c} icon={<TagIcon />} />
       ))}
       <div className="spacer" />
+      <Item f={{ kind: 'incident' }} label={ko.main.incident} icon={<AlertIcon />} />
       <Item f={{ kind: 'trash' }} label={ko.main.trash} count={trash.length || undefined} icon={<TrashIcon />} />
       <div className="side-foot">
         <StatusBadge status={status} local={app.backendKind === 'memory'} />
@@ -335,8 +339,9 @@ function NoteList() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
   }, [notes]);
   const title =
-    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : filter.kind === 'keys' ? ko.main.allKeys : ko.main.allNotes;
+    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : filter.kind === 'keys' ? ko.main.allKeys : filter.kind === 'incident' ? ko.main.incident : ko.main.allNotes;
   const inTrash = filter.kind === 'trash';
+  const isIncident = filter.kind === 'incident';
   const isToday = filter.kind === 'today';
   const home = isToday || filter.kind === 'all';
   const envFilter = useApp((s) => s.envFilter);
@@ -344,6 +349,7 @@ function NoteList() {
   const setEnvImport = useApp((s) => s.setEnvImport);
   // 키를 넣는 화면: 오늘, 모든 키, 프로젝트
   const keyScreen = isToday || filter.kind === 'keys' || filter.kind === 'folder';
+  const noList = isToday || isIncident; // 목록 대신 자기 화면을 그리는 곳: 보기 방식·정렬을 숨긴다
   const project = filter.kind === 'folder' ? filter.folder : null;
   const envs = useMemo(() => (filter.kind === 'folder' ? envsOf(notes, project) : []), [notes, filter.kind, project]);
   const projectHasKeys = filter.kind === 'folder' && notes.some((n) => n.secret && n.folder === project);
@@ -358,7 +364,7 @@ function NoteList() {
         <div className="list-title-row">
           <h1 className="list-title">{title}</h1>
           <button type="button" className="btn btn-sm mobile-only" onClick={() => setScreen('settings')}>{ko.main.settings}</button>
-          {filter.kind !== 'keys' && !inTrash && (
+          {filter.kind !== 'keys' && !inTrash && !isIncident && (
             <button type="button" className={`btn btn-sm desktop-only${keyScreen ? '' : ' btn-primary'}`} onClick={() => void actions.newNote()} title="Alt+N">
               <PlusIcon />
               {ko.main.newNote}
@@ -371,7 +377,7 @@ function NoteList() {
             </button>
           )}
         </div>
-        {!inTrash && <QuickAdd />}
+        {!inTrash && !isIncident && <QuickAdd />}
         <div className="folder-chips">
           <button type="button" aria-pressed={isToday} onClick={() => setFilter({ kind: 'today' })}>{ko.main.home}</button>
           <button type="button" aria-pressed={filter.kind === 'keys'} onClick={() => setFilter({ kind: 'keys' })}>{ko.main.allKeys}</button>
@@ -385,7 +391,7 @@ function NoteList() {
           ))}
           <button type="button" aria-pressed={inTrash} onClick={() => setFilter({ kind: 'trash' })}>{ko.main.trash}</button>
         </div>
-        {keyScreen && (
+        {keyScreen && !isIncident && (
           <div className="env-bar">
             {envs.length > 0 && (
               <div className="segment" role="group" aria-label={ko.keys.env}>
@@ -402,7 +408,7 @@ function NoteList() {
             {projectHasKeys && <button type="button" className="btn-link muted" onClick={() => void downloadProjectEnv(notes, project, envFilter)}>{ko.keys.download}</button>}
           </div>
         )}
-        {!isToday && <div className="list-head">
+        {!noList && <div className="list-head">
           <div className="segment" role="group" aria-label={ko.main.viewLabel}>
             {(['list', 'cards', 'calendar'] as const).map((v) => (
               <button key={v} type="button" aria-pressed={view === v} onClick={() => setPref('view', v)}>{ko.main.views[v]}</button>
@@ -423,7 +429,9 @@ function NoteList() {
       </div>
       <div className="list-scroll">
         {inTrash && list.length > 0 && <p className="small muted" style={{ padding: '10px 16px 0' }}>{ko.main.trashHint}</p>}
-        {isToday && notes.length > 0 ? (
+        {isIncident ? (
+          <IncidentView />
+        ) : isToday && notes.length > 0 ? (
           <TodayView now={now} onDaily={() => void actions.today()} />
         ) : view === 'calendar' && !inTrash && !isToday ? (
           <CalendarView list={list} now={now} />
