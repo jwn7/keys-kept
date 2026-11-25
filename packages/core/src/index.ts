@@ -30,3 +30,4 @@ export { parseEnv, formatEnv } from './secrets/envfile';
 export type { EnvEntry } from './secrets/envfile';
 export { isSecret, planEnvImport, envForProject, secretIssues, placesUsed, compromisedBy, maskValue } from './secrets/ledger';
 export type { SecretIssue } from './secrets/ledger';
+export { sealEnv, openEnv, envAgeFileName, EnvPassphraseError } from './secrets/envage';

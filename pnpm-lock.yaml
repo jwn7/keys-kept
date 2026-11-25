@@ -280,6 +280,16 @@ importers:
         specifier: ^6.2.7
         version: 6.2.7
 
+  packages/env:
+    dependencies:
+      age-encryption:
+        specifier: ^0.3.1
+        version: 0.3.1
+    devDependencies:
+      '@vault/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@apideck/better-ajv-errors@0.3.7':

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { detectKey, formatEnv, envForProject, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
+import { detectKey, envAgeFileName, formatEnv, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
 import { useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
@@ -308,6 +308,22 @@ export function EnvImportDialog({ initialText, project: initialProject, onClose 
       </div>
     </div>
   );
+}
+
+/** 프로젝트의 값을 암호화된 .env.age(표준 age)로 내려받는다. 평문 파일을 남기지 않고 vault-run 이 풀어 쓴다. */
+export async function downloadSealedEnv(notes: Note[], project: string | null, env: string | null): Promise<void> {
+  const envs = envsOf(notes, project);
+  let chosen = env;
+  if (chosen === null && envs.length > 0) {
+    const answer = await ui.prompt({ title: K.pickEnv, label: K.env, initial: envs[0], suggestions: envs, confirmLabel: ko.common.confirm, allowEmpty: true });
+    if (answer === null) return;
+    chosen = answer.trim() || null;
+  }
+  const pass = await ui.prompt({ title: K.sealedTitle, body: K.sealedBody, label: K.sealedPass, password: true, confirmLabel: K.download });
+  if (!pass) return;
+  const name = envAgeFileName(chosen);
+  downloadBytes(name, await sealEnv(envForProject(notes, { project, env: chosen }), pass));
+  ui.toast(K.sealedDone(name));
 }
 
 /** 프로젝트의 .env를 파일로 내려받는다. 평문 파일이 디스크에 생기므로 먼저 확인받는다. */
