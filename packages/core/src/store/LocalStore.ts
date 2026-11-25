@@ -10,6 +10,8 @@ export type VersionEntry = { seq?: number; noteId: string; version: number; item
 /** DATA-MODEL.md §로컬 meta 키. 값 타입은 키마다 다르다. */
 export type MetaMap = {
   lastSyncAt: string;
+  /** 서버 전체를 마지막으로 다시 훑은 시각 (되돌리기 감지, SyncEngine) */
+  lastFullCheckAt: string;
   deviceId: string;
   deviceName: string;
   backend: 'memory' | 'drive' | 'supabase';

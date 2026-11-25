@@ -34,6 +34,75 @@ describe('SyncEngine — 두 기기 시뮬레이션', () => {
     await storeB.destroy();
   });
 
+  describe('되돌리기 감지 (서버가 옛 암호문을 다시 내놓을 때)', () => {
+    it('덮어쓰지 않고, 이 기기의 최신본으로 서버를 되돌려 놓고, 알린다', async () => {
+      const n = await A.save({ title: '계약 조건', body: '초안' });
+      await A.sync();
+      const old = (await backend.get(n.id))!;
+      await tick();
+      await A.save({ id: n.id, body: '최종본' });
+      await A.sync();
+      const events: number[] = [];
+      A.subscribe((e) => e.type === 'rollback' && events.push(e.count));
+
+      backend.forceSet(old); // 서버가 옛 버전으로 돌아갔다
+      const r = await A.sync({ full: true });
+
+      expect(r.rollbacks).toBe(1);
+      expect(events).toEqual([1]);
+      expect(A.get(n.id)?.body).toBe('최종본'); // 로컬은 그대로
+      expect((await backend.get(n.id))!.version).toBeGreaterThan(old.version); // 서버도 최신본으로
+      expect(await storeA.outbox()).toHaveLength(0);
+      expect(A.status.state).toBe('synced');
+      // 다른 기기는 옛 버전이 아니라 최종본을 받는다
+      await B.sync();
+      expect(B.get(n.id)?.body).toBe('최종본');
+    });
+
+    it('지운 메모를 서버가 되살려 놓아도 다시 살아나지 않는다', async () => {
+      const n = await A.save({ title: '지울 메모', body: '비밀' });
+      await A.sync();
+      const alive = (await backend.get(n.id))!;
+      await tick();
+      await A.delete(n.id);
+      await A.sync();
+
+      backend.forceSet(alive);
+      const r = await A.sync({ full: true });
+
+      expect(r.rollbacks).toBe(1);
+      expect(A.get(n.id)).toBeUndefined();
+      expect((await backend.get(n.id))!.deletedAt).not.toBeNull();
+    });
+
+    it('정상 흐름은 되돌리기로 보지 않는다: 다른 기기의 새 수정, 내가 아직 안 올린 수정', async () => {
+      const n = await A.save({ title: '공유', body: 'v1' });
+      await A.sync();
+      await B.sync();
+      await tick();
+      await B.save({ id: n.id, body: 'v2 (폰)' });
+      await B.sync();
+      expect((await A.sync({ full: true })).rollbacks).toBe(0);
+      expect(A.get(n.id)?.body).toBe('v2 (폰)');
+      await tick();
+      await A.save({ id: n.id, body: 'v3 (아직 안 올림)' }); // 서버는 v2, 로컬은 v3 대기 중
+      const r = await A.sync({ full: true });
+      expect(r.rollbacks).toBe(0);
+      expect(r.pushed).toBe(1);
+    });
+
+    it('하루에 한 번은 전체를 다시 훑는다 (바뀐 것만 받는 평소 동기화는 옛 날짜의 암호문을 못 본다)', async () => {
+      await A.save({ title: 'x', body: 'y' });
+      await A.sync(); // 올림
+      await A.sync(); // 서버에 생긴 것을 확인하며 lastSyncAt이 정해진다
+      await A.sync();
+      expect(backend.listCalls.at(-1)).not.toBeNull(); // 방금 전체를 봤으면 평소대로
+      await storeA.setMeta('lastFullCheckAt', new Date(Date.now() - 25 * 3600_000).toISOString());
+      await A.sync();
+      expect(backend.listCalls.at(-1)).toBeNull(); // 하루가 지났으면 전체
+    });
+  });
+
   it('1. A 저장 → A sync → B sync → B에 같은 메모', async () => {
     const n = await A.save({ title: 'PC에서 씀', body: '본문' });
     const ra = await A.sync();

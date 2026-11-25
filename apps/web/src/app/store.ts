@@ -4,6 +4,8 @@ import type { AppSession } from './session';
 import { createAppSession } from './session';
 import { runAutoBackup } from './autoBackup';
 import { markOpen } from './metrics';
+import { ui } from './ui';
+import { ko } from '../i18n/ko';
 
 export type Filter = { kind: 'today' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
 export type SortKey = 'updated' | 'created' | 'title';
@@ -76,6 +78,8 @@ export const useApp = create<AppState>((set, get) => {
   app.session.subscribe((e) => {
     if (e.type === 'status') set({ status: e.status });
     else if (e.type === 'notes') set(pull());
+    // 서버가 옛 암호문을 내놓았다(고장 또는 조작). 덮어쓰지 않았고 이미 고쳐 놓았다는 것을 알린다 (docs/SECURITY.md)
+    else if (e.type === 'rollback') ui.toast(ko.sync.rollback(e.count));
     else if (e.type === 'lock') {
       // setup 화면은 복구 문구를 보여준 뒤 스스로 main으로 넘어간다.
       const screen = e.locked ? 'unlock' : get().screen === 'setup' ? 'setup' : 'main';

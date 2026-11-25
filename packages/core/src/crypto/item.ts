@@ -1,5 +1,6 @@
 import { open, seal } from './aead';
 import { DecryptError } from './errors';
+import { padPlaintext } from './padding';
 import { fromBase64, fromUtf8, toBase64, toUtf8 } from '../model/codec';
 import type { EncryptedItem, ItemType, Note } from '../model/types';
 
@@ -20,7 +21,8 @@ export function encryptNote(
   version = 1,
 ): EncryptedItem {
   const type: ItemType = 'note';
-  const { nonce, ciphertext } = seal(itemsKey, fromUtf8(JSON.stringify(note)), aadBytes(note.id, type));
+  // 길이로 메모를 구분하지 못하게 구간 크기까지 채운 뒤 암호화한다 (padding.ts)
+  const { nonce, ciphertext } = seal(itemsKey, padPlaintext(fromUtf8(JSON.stringify(note))), aadBytes(note.id, type));
   return {
     id: note.id,
     type,

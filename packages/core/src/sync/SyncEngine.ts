@@ -2,9 +2,19 @@ import { ConflictError, OfflineError, type SyncBackend } from './SyncBackend';
 import type { LocalStore } from '../store/LocalStore';
 import type { EncryptedItem, SyncStatus } from '../model/types';
 
-export type SyncEvent = { type: 'status'; status: SyncStatus } | { type: 'changed'; ids: string[] };
+export type SyncEvent = { type: 'status'; status: SyncStatus } | { type: 'changed'; ids: string[] } | { type: 'rollback'; ids: string[] };
 
-export type SyncResult = { pulled: number; pushed: number; conflicts: number; changedIds: string[] };
+export type SyncResult = {
+  pulled: number;
+  pushed: number;
+  conflicts: number;
+  /** 서버가 이 기기보다 옛 버전을 갖고 있어서, 이 기기의 최신본으로 다시 올린 항목 수 */
+  rollbacks: number;
+  changedIds: string[];
+};
+
+/** 평소에는 지난 동기화 이후 바뀐 것만 받는다. 이 간격마다 한 번은 전체를 다시 훑는다. */
+const FULL_CHECK_EVERY_MS = 24 * 3600_000;
 
 export type SyncEngineOptions = {
   store: LocalStore;
@@ -21,6 +31,11 @@ export type SyncEngineOptions = {
 /**
  * pull → push → lastSyncAt. 암호문(EncryptedItem)만 다루며 평문을 모른다.
  * 충돌 규칙(SPEC §3.1): updatedAt 큰 쪽 채택, 진 쪽은 충돌 사본 + versions 보존. 조용히 버리지 않는다.
+ *
+ * 되돌리기 감지(docs/SECURITY.md): 서버를 믿지 않는다. 서버가 내놓은 항목이 이 기기가 이미 가진 것보다
+ * 버전도 낮고 시각도 이르면(그리고 내가 올리려고 대기 중인 것이 아니면) 서버가 옛 상태로 돌아간 것이다.
+ * 그 항목으로 덮어쓰지 않고, 이 기기의 최신본을 다시 올려 서버를 고치고, 'rollback' 이벤트로 알린다.
+ * 이 기기의 blobs가 "내가 본 최신 버전"의 기록이므로 따로 저장하는 것은 없다.
  */
 export class SyncEngine {
   private readonly store: LocalStore;
@@ -30,6 +45,7 @@ export class SyncEngine {
   private readonly isOnline: () => boolean;
   private listeners = new Set<(e: SyncEvent) => void>();
   private inflight: Promise<SyncResult> | null = null;
+  private inflightFull = false;
   private _status: SyncStatus = { state: 'offline', pending: 0 };
 
   constructor(opts: SyncEngineOptions) {
@@ -49,26 +65,33 @@ export class SyncEngine {
     return () => this.listeners.delete(cb);
   }
 
-  /** 겹쳐 호출되면 진행 중인 것을 공유한다. */
-  sync(): Promise<SyncResult> {
-    if (this.inflight) return this.inflight;
-    this.inflight = this.run().finally(() => {
-      this.inflight = null;
+  /** 겹쳐 호출되면 진행 중인 것을 공유한다. full: 바뀐 것만이 아니라 서버 전체를 다시 훑는다. */
+  sync(opts: { full?: boolean } = {}): Promise<SyncResult> {
+    if (this.inflight && (this.inflightFull || !opts.full)) return this.inflight;
+    const prev = this.inflight;
+    this.inflightFull = !!opts.full;
+    const p: Promise<SyncResult> = (prev ? prev.then(() => this.run(!!opts.full)) : this.run(!!opts.full)).finally(() => {
+      if (this.inflight === p) this.inflight = null;
     });
-    return this.inflight;
+    this.inflight = p;
+    return p;
   }
 
-  private async run(): Promise<SyncResult> {
-    const result: SyncResult = { pulled: 0, pushed: 0, conflicts: 0, changedIds: [] };
+  private async run(forceFull: boolean): Promise<SyncResult> {
+    const result: SyncResult = { pulled: 0, pushed: 0, conflicts: 0, rollbacks: 0, changedIds: [] };
     const changed = new Set<string>();
+    const rolledBack: string[] = [];
     if (!this.isOnline()) {
       await this.setOffline();
       return result;
     }
     this.setStatus({ state: 'syncing' });
     try {
-      await this.pull(result, changed);
+      const lastFull = await this.store.getMeta('lastFullCheckAt');
+      const full = forceFull || !lastFull || Date.now() - Date.parse(lastFull) > FULL_CHECK_EVERY_MS;
+      await this.pull(result, changed, rolledBack, full);
       await this.push(result, changed);
+      if (full) await this.store.setMeta('lastFullCheckAt', new Date().toISOString());
     } catch (e) {
       result.changedIds = [...changed];
       if (changed.size) this.emit({ type: 'changed', ids: result.changedIds });
@@ -86,6 +109,7 @@ export class SyncEngine {
     }
     result.changedIds = [...changed];
     if (changed.size) this.emit({ type: 'changed', ids: result.changedIds });
+    if (rolledBack.length) this.emit({ type: 'rollback', ids: rolledBack });
     const pending = (await this.store.outbox()).length;
     if (pending > 0) this.setStatus({ state: 'offline', pending });
     else if (result.conflicts > 0) this.setStatus({ state: 'conflict', count: result.conflicts });
@@ -94,9 +118,9 @@ export class SyncEngine {
   }
 
   // ---- pull ----
-  private async pull(result: SyncResult, changed: Set<string>): Promise<void> {
+  private async pull(result: SyncResult, changed: Set<string>, rolledBack: string[], full: boolean): Promise<void> {
     const since = (await this.store.getMeta('lastSyncAt')) ?? null;
-    const remoteItems = await this.backend.list(since);
+    const remoteItems = await this.backend.list(full ? null : since);
     const pendingIds = new Set((await this.store.outbox()).map((e) => e.id));
     let maxUpdatedAt = since;
 
@@ -111,10 +135,19 @@ export class SyncEngine {
         result.pulled++;
         continue;
       }
+      // 되돌리기: 서버 것이 내가 가진 것보다 버전도 낮고 시각도 이르다. 덮어쓰지 않고 내 최신본을 다시 올린다.
+      if (!pendingIds.has(remote.id) && remote.version < local.version && remote.updatedAt < local.updatedAt) {
+        await this.store.enqueue(local.id, 'put');
+        rolledBack.push(local.id);
+        result.rollbacks++;
+        continue;
+      }
       // 내 업로드의 메아리: 건너뛴다.
       if (remote.deviceId === this.deviceId && remote.version <= local.version) continue;
 
       if (pendingIds.has(remote.id)) {
+        // 전체를 다시 훑을 때는 예전에 이미 받아 본 암호문도 다시 온다. 그것은 새 수정이 아니므로 충돌이 아니다.
+        if (await this.seenBefore(remote)) continue;
         // 양쪽 다 바뀜 → 충돌
         await this.resolve(local, remote, changed);
         result.conflicts++;
@@ -128,6 +161,11 @@ export class SyncEngine {
       }
     }
     if (maxUpdatedAt !== null && maxUpdatedAt !== since) await this.store.setMeta('lastSyncAt', maxUpdatedAt);
+  }
+
+  /** 이 암호문을 전에 받은 적이 있는가. 받은 것은 전부 versions에 남으므로 nonce로 알아본다 (nonce는 암호문마다 다르다). */
+  private async seenBefore(remote: EncryptedItem): Promise<boolean> {
+    return (await this.store.versions(remote.id)).some((v) => v.item.nonce === remote.nonce);
   }
 
   // ---- push ----

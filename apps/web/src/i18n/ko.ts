@@ -88,6 +88,7 @@ export const ko = {
     localOnly: '로컬 전용',
     now: '지금 동기화',
     pending: (n: number) => `업로드 대기 ${n}개`,
+    rollback: (n: number) => `서버에 옛 버전이 있던 메모 ${n}개를 이 기기의 최신본으로 되돌려 놓았습니다.`,
     reconnect: 'Drive 다시 연결',
     reconnectHint: (n: number) => (n > 0 ? `로그인이 만료됐습니다. 변경 ${n}개가 이 기기에 안전하게 남아 있습니다.` : '로그인이 만료됐습니다.'),
   },

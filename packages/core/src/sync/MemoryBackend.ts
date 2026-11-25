@@ -43,6 +43,11 @@ export class MemoryBackend implements SyncBackend {
     this.emit();
   }
 
+  /** 테스트용: 버전 검사 없이 덮어쓴다. 옛 암호문을 다시 내놓는 서버(고장 또는 악의)를 흉내 낸다. */
+  forceSet(item: EncryptedItem): void {
+    this.items.set(item.id, clone(item));
+  }
+
   async delete(id: string, deletedAt: string): Promise<void> {
     this.guard();
     const remote = this.items.get(id);

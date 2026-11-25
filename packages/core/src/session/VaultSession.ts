@@ -57,7 +57,9 @@ export type NoteInput = Partial<Pick<Note, 'id' | 'title' | 'body' | 'tags' | 'f
 export type SessionEvent =
   | { type: 'status'; status: SyncStatus }
   | { type: 'notes' } // 메모 목록이 바뀜 (저장·삭제·동기화·잠금)
-  | { type: 'lock'; locked: boolean };
+  | { type: 'lock'; locked: boolean }
+  /** 서버가 옛 버전을 갖고 있던 메모를 이 기기의 최신본으로 되돌려 놓았다 (docs/SECURITY.md) */
+  | { type: 'rollback'; count: number };
 
 const CONFLICT_MARK = ' (충돌 사본 — ';
 /** 기기 잠금 해제용 키를 뽑을 때 섞는 용도 문자열 (다른 용도의 해시와 겹치지 않게) */
@@ -112,6 +114,7 @@ export class VaultSession {
         this.statusOverride = null;
         this.emit({ type: 'status', status: e.status });
       }
+      if (e.type === 'rollback') this.emit({ type: 'rollback', count: e.ids.length });
       // 'changed'는 sync()에서 결과를 받은 뒤 동기적으로 적용한다 (이벤트로 하면 경쟁 상태).
     });
   }
@@ -459,7 +462,7 @@ export class VaultSession {
 
   // ---- 동기화 ----
 
-  async sync(): Promise<SyncResult> {
+  async sync(opts: { full?: boolean } = {}): Promise<SyncResult> {
     try {
       await this.ensureRemoteKeys();
     } catch (e) {
@@ -470,7 +473,7 @@ export class VaultSession {
         throw e;
       }
     }
-    const result = await this.engine.sync();
+    const result = await this.engine.sync(opts);
     if (result.changedIds.length) await this.applyChanged(result.changedIds);
     return result;
   }
