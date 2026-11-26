@@ -1,6 +1,6 @@
 {
   "name": "keys-kept",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run commands with keys from an encrypted .env.age, without a plaintext .env. Includes an MCP server so AI coding tools use keys by name, never by value.",
   "keywords": [
     "env",
@@ -15,12 +15,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jwn7/vault-notes.git",
+    "url": "git+https://github.com/jwn7/keys-kept.git",
     "directory": "packages/env"
   },
-  "homepage": "https://github.com/jwn7/vault-notes/tree/main/packages/env#readme",
+  "homepage": "https://github.com/jwn7/keys-kept/tree/main/packages/env#readme",
   "bugs": {
-    "url": "https://github.com/jwn7/vault-notes/issues"
+    "url": "https://github.com/jwn7/keys-kept/issues"
   },
   "type": "module",
   "engines": {

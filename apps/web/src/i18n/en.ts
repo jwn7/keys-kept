@@ -498,7 +498,7 @@ export const en: Strings = {
     copyCommand: 'Copy command',
     copiedCommand: 'Copied. Replace <file passphrase> with the passphrase you set above.',
     plugin: 'Install as a Claude Code plugin',
-    pluginSteps: ['/plugin marketplace add jwn7/vault-notes', '/plugin install keys-kept@vault-notes'],
+    pluginSteps: ['/plugin marketplace add jwn7/keys-kept', '/plugin install keys-kept@keys-kept'],
     pluginHint: 'With the plugin, set VAULT_ENV_PASSPHRASE in your shell.',
     aiGets: 'What the AI gets',
     aiGetsValue: (n: number) => `${count(n, 'key name')}, missing names`,

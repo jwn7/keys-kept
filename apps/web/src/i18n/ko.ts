@@ -494,7 +494,7 @@ const korean = {
     copyCommand: '명령 복사',
     copiedCommand: '명령을 복사했습니다. <파일 비밀번호> 자리에 위에서 정한 비밀번호를 넣으세요.',
     plugin: 'Claude Code 플러그인으로 설치',
-    pluginSteps: ['/plugin marketplace add jwn7/vault-notes', '/plugin install keys-kept@vault-notes'],
+    pluginSteps: ['/plugin marketplace add jwn7/keys-kept', '/plugin install keys-kept@keys-kept'],
     pluginHint: '플러그인으로 설치하면 셸에 VAULT_ENV_PASSPHRASE를 정해 둡니다.',
     aiGets: 'AI가 받는 것',
     aiGetsValue: (n: number) => `키 이름 ${n}개, 빠진 이름`,

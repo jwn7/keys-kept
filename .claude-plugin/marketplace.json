@@ -1,5 +1,5 @@
 {
-  "name": "vault-notes",
+  "name": "keys-kept",
   "description": "Keys Kept: use API keys from an encrypted local vault in Claude Code without pasting secrets.",
   "owner": { "name": "jwn7" },
   "plugins": [

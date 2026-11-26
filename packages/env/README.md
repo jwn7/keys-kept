@@ -2,7 +2,7 @@
 
 Run commands with keys from an encrypted `.env.age`, without a plaintext `.env` on disk. Includes an MCP server so AI coding tools (Claude Code, Cursor) use your keys **by name** and never receive the values.
 
-The encrypted files come from the Keys Kept app ([jwn7/vault-notes](https://github.com/jwn7/vault-notes)), and they are standard [age](https://age-encryption.org) files, so `age -d .env.age` also works.
+The encrypted files come from the Keys Kept app ([jwn7/keys-kept](https://github.com/jwn7/keys-kept)), and they are standard [age](https://age-encryption.org) files, so `age -d .env.age` also works.
 
 ```sh
 npx keys-kept run -- npm run dev          # decrypt into this command's environment only
@@ -12,7 +12,7 @@ npx keys-kept push github --repo me/app   # copy keys into GitHub Actions secret
 npx keys-kept mcp                         # MCP server (stdio): list_keys, run_with_keys, request_key
 ```
 
-Claude Code: `/plugin marketplace add jwn7/vault-notes` then `/plugin install keys-kept@vault-notes`, or
+Claude Code: `/plugin marketplace add jwn7/keys-kept` then `/plugin install keys-kept@keys-kept`, or
 `claude mcp add --transport stdio --env VAULT_ENV_PASSPHRASE=<file password> keys-kept -- npx -y keys-kept mcp`.
 
 A `.vault.yml` in the project folder links it to a vault project and picks the file per git branch:

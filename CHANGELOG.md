@@ -21,6 +21,9 @@ Encryption core, sync (Drive, folder, Supabase Pro), age backups, key ledger (re
 
 ## keys-kept (npm)
 
+### 0.1.1 (2026-11-26)
+- The repository moved to `jwn7/keys-kept`. Links and the Claude Code install command are updated: `/plugin install keys-kept@keys-kept` (the marketplace is now named `keys-kept`).
+
 ### 0.1.0 (2026-11-26)
 - First npm release. Single command `keys-kept run | mcp | check | scan | push`.
 - `.vault.yml` (`project`, `ai`, `branches`, `required`); `.vault.json` still read.

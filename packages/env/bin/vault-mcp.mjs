@@ -142,7 +142,7 @@ createInterface({ input: process.stdin }).on('line', async (line) => {
   const reply = (result) => send({ jsonrpc: '2.0', id: req.id, result });
   try {
     if (req.method === 'initialize') {
-      reply({ protocolVersion: req.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'keys-kept', version: '0.1.0' } });
+      reply({ protocolVersion: req.params?.protocolVersion ?? '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'keys-kept', version: '0.1.1' } });
     } else if (req.method === 'ping') {
       reply({});
     } else if (req.method === 'tools/list') {

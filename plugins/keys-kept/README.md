@@ -3,8 +3,8 @@
 Lets Claude Code use API keys from your encrypted vault **by name only**. Claude never sees the values and never asks you to paste them.
 
 ```
-/plugin marketplace add jwn7/vault-notes
-/plugin install keys-kept@vault-notes
+/plugin marketplace add jwn7/keys-kept
+/plugin install keys-kept@keys-kept
 ```
 
 Then set the key file password in the shell that starts Claude Code (`VAULT_ENV_PASSPHRASE`, or `VAULT_ENV_IDENTITY_FILE` for files a teammate sealed to your public key) and restart.

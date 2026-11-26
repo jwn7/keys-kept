@@ -3,7 +3,7 @@
 올리는 것은 사람이 한다(계정이 필요하고, 댓글에 답해야 한다). 올리기 전에 확인할 것:
 - [ ] `npm view keys-kept version`이 나온다 (npm 배포)
 - [ ] 웹 데모 링크가 열린다 (GitHub Pages)
-- [ ] 저장소 이름을 `keys-kept`로 바꿨다면 아래 주소들을 바꿨다
+- [x] 저장소 이름을 `keys-kept`로 바꿨다 (2026-11-26, 주소 반영함)
 - [ ] README 첫 화면의 데모 그림이 GitHub에서 움직인다
 
 원칙: 한계(외부 보안 검토 없음, MCP가 막지 못하는 것)를 먼저 말한다. 보안 도구는 과장하면 그 지점부터 공격받는다. 하루에 한 곳씩, 댓글에 바로 답할 수 있는 날에 올린다.
@@ -31,9 +31,9 @@ Key files are standard age files, so `age -d` opens them without this project.
 
 Limits, honestly: no external security review yet. Masking matches exact strings only, and a command you allow can still send a value somewhere. The threat model and what it does not cover are in SECURITY.md.
 
-Repo: https://github.com/jwn7/vault-notes
-Try the app in the browser (data stays in your browser): <데모 주소>
-Claude Code plugin: /plugin marketplace add jwn7/vault-notes
+Repo: https://github.com/jwn7/keys-kept
+Try the app in the browser (data stays in your browser): https://jwn7.github.io/keys-kept/
+Claude Code plugin: /plugin marketplace add jwn7/keys-kept
 
 I'd especially like feedback on the MCP design and the threat model.
 ```
@@ -57,14 +57,14 @@ So I built keys-kept (MIT): an MCP server + Claude Code plugin.
 - request_key: when a key is missing, it tells you to add it in the app, not in chat
 - .vault.yml picks the environment per git branch and can turn AI access off for a project
 
-/plugin marketplace add jwn7/vault-notes
-/plugin install keys-kept@vault-notes
+/plugin marketplace add jwn7/keys-kept
+/plugin install keys-kept@keys-kept
 
 The keys live in an encrypted, local-first ledger app (AGPL) that also tracks where each key is used and what to rotate after a leak.
 
 Not externally audited yet, and it can't stop a command you approve from sending a value somewhere. Feedback welcome, especially on what would make you trust it.
 
-Repo: https://github.com/jwn7/vault-notes
+Repo: https://github.com/jwn7/keys-kept
 ```
 
 ### r/selfhosted (앱 중심)
@@ -92,8 +92,8 @@ Claude Code나 Cursor가 "이 키를 넣어 주세요"라고 할 때마다 채�
 
 한계: 외부 보안 검토는 아직 받지 못했습니다. 가리기는 값과 똑같은 글자만 잡고, 허락한 명령이 값을 다른 곳으로 보내는 것은 막지 못합니다.
 
-저장소: https://github.com/jwn7/vault-notes
-웹에서 써 보기: <데모 주소>
+저장소: https://github.com/jwn7/keys-kept
+웹에서 써 보기: https://jwn7.github.io/keys-kept/
 ```
 
 ---
@@ -103,7 +103,7 @@ Claude Code나 Cursor가 "이 키를 넣어 주세요"라고 할 때마다 채�
 ### awesome-mcp-servers (github.com/punkpeye/awesome-mcp-servers)
 "Security" 분류에 한 줄 PR. 저장소의 CONTRIBUTING 형식(언어·범위 아이콘)을 먼저 확인하고 맞춘다.
 ```
-- [jwn7/vault-notes](https://github.com/jwn7/vault-notes/tree/main/packages/env) 📇 🏠 - Lets AI coding tools use API keys from an encrypted local vault by name only; values are injected as env vars and masked in output.
+- [jwn7/keys-kept](https://github.com/jwn7/keys-kept/tree/main/packages/env) 📇 🏠 - Lets AI coding tools use API keys from an encrypted local vault by name only; values are injected as env vars and masked in output.
 ```
 
 ### 공식 MCP 레지스트리

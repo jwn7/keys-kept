@@ -6,8 +6,8 @@
 
 ```sh
 # Claude Code: MCP server + skill
-/plugin marketplace add jwn7/vault-notes
-/plugin install keys-kept@vault-notes
+/plugin marketplace add jwn7/keys-kept
+/plugin install keys-kept@keys-kept
 
 # Any shell: run with keys from an encrypted .env.age, no plaintext .env
 npx keys-kept run -- npm run dev
@@ -44,8 +44,8 @@ npx keys-kept scan
 npx keys-kept push github --repo me/app --dry-run
 
 # Let Claude Code use keys by name (MCP server + skill):
-#   /plugin marketplace add jwn7/vault-notes
-#   /plugin install keys-kept@vault-notes
+#   /plugin marketplace add jwn7/keys-kept
+#   /plugin install keys-kept@keys-kept
 ```
 In the app, `Ctrl K`, a few letters of the key name, and `Enter` copies the value. `Shift Enter` copies `NAME=value`.
 
