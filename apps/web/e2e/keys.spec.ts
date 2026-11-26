@@ -114,10 +114,14 @@ test('꺼내 쓰기: Ctrl+K → 이름 → Enter로 값 복사, Shift+Enter로 �
   await input.press('Enter');
   expect(await clipboard(page)).toBe(OPENAI);
   await expect(page.locator('.editor-title')).toHaveCount(0); // 열지 않고 복사만 했다
+  await expect(input).toHaveCount(0); // 팔레트가 닫혔다
 
+  // 다시 열기: 단계마다 확인해서, 실패하면 "안 열림"인지 "열렸는데 못 찾음"인지 바로 보이게
   await page.keyboard.press('Control+k');
-  await page.getByPlaceholder('키 이름으로 찾기 또는 명령…').fill('openai');
-  await page.getByPlaceholder('키 이름으로 찾기 또는 명령…').press('Shift+Enter');
+  await expect(input).toBeVisible();
+  await input.fill('openai');
+  await expect(page.locator('.palette-item').first()).toContainText('OPENAI_API_KEY');
+  await input.press('Shift+Enter');
   expect(await clipboard(page)).toBe(`OPENAI_API_KEY=${OPENAI}`);
 });
 

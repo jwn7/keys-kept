@@ -12,7 +12,10 @@ export default defineConfig({
   workers: 1, // Argon2id가 테스트마다 256MB를 쓴다
   // CI에서는 실패 메시지를 GitHub 주석으로도 남긴다 (로그를 내려받지 않고 원인을 볼 수 있게)
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
-  use: { baseURL: 'http://localhost:5173', channel: 'chrome', viewport: { width: 1280, height: 800 }, locale: 'ko-KR' },
+  // CI(리눅스, 더 느림)에서만 가끔 실패하는 흐름이 있었다 (2026-11-26, Ctrl+K 두 번째). 한 번 더 돌리고, 통과하면 flaky로 표시된다.
+  // 실패한 시도의 기록(trace: 화면·입력·포커스)과 스크린샷은 남겨서 CI 결과물로 올린다 (.github/workflows/ci.yml).
+  retries: process.env.CI ? 1 : 0,
+  use: { baseURL: 'http://localhost:5173', channel: 'chrome', viewport: { width: 1280, height: 800 }, locale: 'ko-KR', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   // Drive 연결 버튼은 클라이언트 ID가 있어야 켜진다. CI에는 .env가 없으므로 테스트용 값을 준다(가짜 Drive만 부른다).
   webServer: {
     command: 'pnpm dev',

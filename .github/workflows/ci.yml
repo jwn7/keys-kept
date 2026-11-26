@@ -48,6 +48,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @vault/web e2e
+      # 실패한(또는 다시 돌려 통과한) 흐름의 기록. Actions 실행 화면의 Artifacts에서 내려받아 `npx playwright show-trace`로 본다
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: e2e-traces
+          path: apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
       # 배포 빌드에서 콘텐츠 보안 정책이 앱을 막지 않고, 바깥으로 보내는 것은 막는지 (docs/SECURITY.md)
       - name: CSP check on the production build
         working-directory: apps/web
