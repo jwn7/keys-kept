@@ -1,8 +1,19 @@
-# Vault
+# Keys Kept
 
-A key ledger for solo developers. Keep API keys, environment variables, and account details in one encrypted place, and know **where each key is used, when it expires, and what to rotate when something leaks**.
+**Your AI coding tool can use your API keys without ever seeing them.** A key ledger for solo developers and vibe coders: keys, env vars, and accounts in one encrypted place, with where each key is used, when it expires, and what to rotate when something leaks.
 
-[한국어 README](README.ko.md)
+<p align="center"><img src="docs/assets/demo-claude-code.svg" alt="Claude Code runs tests with keys from Keys Kept. It sees key names only; a missing key is added in the app, not pasted into the chat." width="760"></p>
+
+```sh
+# Claude Code: MCP server + skill
+/plugin marketplace add jwn7/vault-notes
+/plugin install keys-kept@vault-notes
+
+# Any shell: run with keys from an encrypted .env.age, no plaintext .env
+npx keys-kept run -- npm run dev
+```
+
+[한국어 README](README.ko.md) · [CHANGELOG](CHANGELOG.md) · [Security](SECURITY.md)
 
 > **Not externally reviewed.** Use it for keys you can rotate, and keep a backup. See [SECURITY.md](SECURITY.md) for the limits.
 

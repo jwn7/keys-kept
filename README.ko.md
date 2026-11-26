@@ -1,8 +1,20 @@
-# Vault (가칭)
+# Keys Kept
 
-[English README](README.md)
+**AI 코딩 도구가 API 키를 쓰되, 값은 보지 못하게.** 1인 개발자와 바이브코더를 위한 **키 장부**. API 키, 환경변수, 계정 정보를 메모장에 적어 두는 대신 기기에서 잠가 보관하고, 어디에 쓰이는지·언제 끝나는지·털리면 뭘 바꿔야 하는지를 같이 관리한다.
 
-1인 개발자와 바이브코더를 위한 **키 장부**. API 키, 환경변수, 계정 정보를 메모장에 적어 두는 대신 기기에서 잠가 보관하고, 어디에 쓰이는지·언제 끝나는지·털리면 뭘 바꿔야 하는지를 같이 관리한다.
+<p align="center"><img src="docs/assets/demo-claude-code.svg" alt="Claude Code가 Keys Kept의 키로 테스트를 돌린다. 키 이름만 보고, 빠진 키는 채팅이 아니라 앱에 넣는다." width="760"></p>
+
+```sh
+# Claude Code: MCP 서버 + 스킬
+/plugin marketplace add jwn7/vault-notes
+/plugin install keys-kept@vault-notes
+
+# 아무 셸에서: 암호화된 .env.age로 실행, 평문 .env 없이
+npx keys-kept run -- npm run dev
+```
+
+[English README](README.md) · [바뀐 점](CHANGELOG.md) · [보안](SECURITY.md)
+
 
 - 키를 붙여 넣으면 어느 서비스의 무슨 키인지 알아보고, 브라우저에 공개되는 이름(`NEXT_PUBLIC_`, `VITE_`)에 비밀 키를 넣으면 경고한다.
 - 꺼내 쓰기: `Ctrl+K` → 이름 → Enter로 복사. `.env` 통째로 넣고 꺼내기.

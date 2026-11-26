@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="452" viewBox="0 0 880 452" role="img" aria-label="Claude Code runs tests with keys from Keys Kept. It sees key names only; a missing key is added in the app, not pasted into the chat.">
+<title>Claude Code uses keys by name with keys-kept</title>
+<style>
+  text { font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", monospace; font-size: 14px; white-space: pre; }
+  .l { opacity: 0; animation: show .25s ease-out forwards; }
+  @keyframes show { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .l { animation: none; opacity: 1; } }
+</style>
+<rect width="880" height="452" rx="12" fill="#15171C"/>
+<rect width="880" height="36" rx="12" fill="#1F2229"/><rect y="24" width="880" height="12" fill="#1F2229"/>
+<circle cx="22" cy="18" r="5.5" fill="#3A3F49"/><circle cx="40" cy="18" r="5.5" fill="#3A3F49"/><circle cx="58" cy="18" r="5.5" fill="#3A3F49"/>
+<text x="80" y="23" fill="#9097A3" style="font-size:12px">~/code/shop · feature/pay → dev · claude</text>
+<g class="l" style="animation-delay:0.4s"><text x="24.0" y="64" fill="#F5D78E" font-weight="700">&gt; run the webhook and mail tests</text></g>
+<g class="l" style="animation-delay:1.4s"><text x="24.0" y="88" fill="#9CB7E8">● keys-kept · list_keys</text></g>
+<g class="l" style="animation-delay:1.9s"><text x="40.8" y="112" fill="#9097A3">STRIPE_SECRET_KEY  STRIPE_WEBHOOK_SECRET  DATABASE_URL  +4   (names only)</text></g>
+<g class="l" style="animation-delay:2.9s"><text x="24.0" y="136" fill="#9CB7E8">● keys-kept · run_with_keys   npm test -- webhook mail</text></g>
+<g class="l" style="animation-delay:3.6s"><text x="40.8" y="160" fill="#7BC79A">✓ webhook  12 passed</text></g>
+<g class="l" style="animation-delay:3.9s"><text x="40.8" y="184" fill="#F0A39E">✗ mail     RESEND_API_KEY is not set</text></g>
+<g class="l" style="animation-delay:4.9s"><text x="24.0" y="208" fill="#9CB7E8">● keys-kept · request_key   RESEND_API_KEY</text></g>
+<g class="l" style="animation-delay:5.4s"><text x="40.8" y="232" fill="#9097A3">Tell the user: add RESEND_API_KEY to shop &gt; dev in the Keys Kept app.</text></g>
+<g class="l" style="animation-delay:5.6s"><text x="40.8" y="256" fill="#9097A3">Do not paste the value into the chat.</text></g>
+<g class="l" style="animation-delay:6.6s"><text x="24.0" y="280" fill="#E7E9ED">● Add RESEND_API_KEY to shop &gt; dev in the app (not here), then I&#x27;ll rerun.</text></g>
+<g class="l" style="animation-delay:8.2s"><text x="24.0" y="304" fill="#F5D78E" font-weight="700">&gt; added it</text></g>
+<g class="l" style="animation-delay:9.0s"><text x="24.0" y="328" fill="#9CB7E8">● keys-kept · run_with_keys   npm test -- webhook mail</text></g>
+<g class="l" style="animation-delay:9.7s"><text x="40.8" y="352" fill="#7BC79A">✓ webhook  12 passed</text></g>
+<g class="l" style="animation-delay:10.0s"><text x="40.8" y="376" fill="#7BC79A">✓ mail      2 passed   sent with <tspan fill="#F5D78E" font-weight="700">[RESEND_API_KEY hidden]</tspan></text></g>
+<g class="l" style="animation-delay:11.0s"><text x="24.0" y="400" fill="#E7E9ED">● All 14 tests pass. The key values never entered this conversation.</text></g>
+</svg>
