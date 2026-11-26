@@ -31,4 +31,19 @@
 7. 확인: `npm view keys-kept version`, 빈 폴더에서 `npx -y keys-kept` 가 명령 목록을 보여 주는지.
 
 ## 앱 배포
-아직 공개 배포하지 않는다 (`docs/ROADMAP.md` 13-2: Google OAuth 등록, 설치형 빌드, 외부 보안 검토가 먼저). 정할 때 이 절을 채운다.
+
+### 지금: 웹 데모 (https://jwn7.github.io/keys-kept/)
+`.github/workflows/pages.yml`이 main에 올라온 앱을 `VITE_DEMO=1`로 빌드해 올린다. 잠금 화면에 "진짜 키를 넣지 마세요"가 뜬다. 데모라고 부르는 이유:
+1. **외부 보안 검토가 없다.**
+2. **주소(origin)를 남과 같이 쓴다.** `jwn7.github.io`는 이 계정의 모든 GitHub Pages가 함께 쓰는 origin이다. 같은 origin의 다른 페이지는 이 앱의 저장소(IndexedDB: 암호문과 감싼 열쇠)를 읽고 바꿀 수 있다. 암호문이라 바로 새지는 않지만, 실제로 쓰는 앱은 자기만의 origin에 둔다.
+3. **동기화가 폴더뿐이다.** Google OAuth 클라이언트가 없어서 Drive 동기화가 꺼져 있다.
+
+### 실제로 쓰게 하려면 (순서대로)
+1. **도메인** (사람이 한다): 예) `keyskept.dev`, `app.<내 도메인>`. GitHub 저장소 Settings > Pages > Custom domain에 넣고 DNS에 CNAME `jwn7.github.io`. HTTPS 강제를 켠다. 그러면 이 앱만의 origin이 생긴다.
+2. **Google OAuth 클라이언트** (사람이 한다): Google Cloud Console > API 및 서비스 > OAuth 동의 화면(외부) → 사용자 인증 정보 > OAuth 클라이언트 ID(웹). 승인된 JavaScript 원본 = 1의 도메인. 범위는 `drive.file`(앱이 만든 파일만). 나온 클라이언트 ID를 저장소 Settings > Secrets and variables > Actions > **Variables**에 `VITE_GOOGLE_CLIENT_ID`로 넣는다(비밀값이 아니다: 브라우저에 그대로 보이는 값). 클라이언트 secret은 쓰지 않고 어디에도 두지 않는다.
+3. **실제 빌드로 바꾸기** (Claude가 한다): pages.yml에서 도메인이면 `VITE_BASE=/`, `VITE_DEMO` 끔, `VITE_GOOGLE_CLIENT_ID`를 변수에서 넣기. CSP 허용 목록은 이미 Google 주소를 갖고 있다(`apps/web/vite.config.ts`). 데모 안내 문구 대신 설정의 "외부 검토 전" 안내만 남긴다.
+4. **계정 지키기** (사람이 한다): GitHub·npm 2단계 인증, main 브랜치 보호(직접 푸시 금지, CI 통과 필수). 웹 앱은 서버가 주는 코드를 믿는 구조라(`docs/SECURITY.md`), 배포 권한이 곧 사용자 키의 안전이다.
+5. **외부 보안 검토**: 검토를 받거나 공개적으로 요청한다(`SECURITY.md`의 신고 경로). 그 전까지 README의 "다시 발급할 수 있는 키만" 안내를 유지한다.
+6. (선택) **설치형 앱**: Tauri 데스크톱·Android(`docs/MOBILE.md`). 코드를 매번 서버에서 받지 않아 4의 위험이 줄어든다.
+
+1·2를 마치면 3은 한 번의 커밋이다. 그 전에도 혼자 쓰는 것은 된다: 데모 주소를 앱으로 설치하고(주소창의 설치 단추) 폴더 동기화로 기기를 잇되, 다시 발급할 수 있는 키만 넣는다.
