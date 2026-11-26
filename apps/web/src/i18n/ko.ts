@@ -6,11 +6,11 @@ import { en } from './en';
  */
 const korean = {
   app: {
-    name: 'Vault',
+    name: 'Keys Kept',
     // 소개 문구는 상표처럼 쓴다: 어느 언어 화면에서도 같은 영어 두 낱말 (2026-11-25 사용자 결정)
     tagline: 'Keys, kept.',
     taglineLines: ['Keys,', 'kept.'],
-    sealMark: 'V',
+    sealMark: 'K',
     sees: [
       { label: '서버가 보는 것', value: '항목 개수, 수정 시각, 크기' },
       { label: '서버가 못 보는 것', value: '키 이름과 값, 프로젝트, 쓰이는 곳, 메모' },
@@ -54,8 +54,27 @@ const korean = {
     newPassword: '새 마스터 비밀번호',
     setPasswordAndOpen: '비밀번호 재설정 후 열기',
   },
+  welcome: {
+    title: 'Keys Kept 시작하기',
+    sub: '회사 서버에 계정이 없습니다. 금고는 기기에서 만들고, 다른 기기에서는 같은 금고를 가져와 같은 비밀번호로 엽니다. 한 기기에서 한 번만 하면 다음부터는 비밀번호나 지문으로 엽니다.',
+    create: '새 금고 만들기',
+    createHint: '이 기기에서 처음 씁니다. 마스터 비밀번호를 정합니다.',
+    existing: '쓰던 금고 열기',
+    existingHint: '다른 기기에서 쓰던 금고를 가져와 원래 비밀번호로 엽니다.',
+    existingTitle: '쓰던 금고 열기',
+    existingSub: '금고를 어디에 두고 쓰셨나요? 가져온 뒤 원래 마스터 비밀번호로 엽니다.',
+    fromDrive: 'Google Drive',
+    fromDriveHint: '원래 기기에서 Drive 동기화를 켜 두었다면',
+    fromFolder: '동기화 폴더',
+    fromFolderHint: 'Dropbox·iCloud 같은 폴더에 암호문을 두고 썼다면 (Chrome·Edge 데스크톱)',
+    fromBackup: '백업 파일 (.age)',
+    fromBackupHint: '내보내 둔 백업 파일에서 복구합니다',
+    back: '처음으로',
+    emptyStore: '연결한 저장소에 아직 금고가 없습니다. 원래 쓰던 기기에서 한 번 동기화한 뒤 다시 열거나, 여기서 새 금고를 만드세요.',
+    createHere: '여기서 새 금고 만들기',
+  },
   setup: {
-    title: '처음 설정',
+    title: '새 금고 만들기',
     sub: '마스터 비밀번호를 정하세요. 이 비밀번호는 어디에도 저장되지 않으며, 잊으면 복구 키 12단어로만 되찾을 수 있습니다.',
     password: '마스터 비밀번호',
     confirm: '비밀번호 확인',
@@ -64,8 +83,6 @@ const korean = {
     strength: ['아주 약함', '약함', '보통', '강함', '아주 강함'],
     create: '열쇠 만들기',
     subShort: '잊으면 복구 키 12단어로만 되찾을 수 있습니다.',
-    fromDrive: '다른 기기에서 쓰던 메모가 있나요? Google Drive에서 불러오기',
-    driveEmpty: '연결한 Drive에 아직 Vault가 없습니다. 원래 쓰던 기기에서 앱을 열어 한 번 동기화한 뒤 다시 시도하세요.',
     step: (n: number, total: number) => `${n} / ${total} 단계`,
     creating: '열쇠 만드는 중…',
     phraseTitle: '복구 키 12단어',
@@ -82,7 +99,7 @@ const korean = {
     run: '복구',
     running: '복구 중…',
     wrongPass: '백업 비밀번호가 틀렸습니다.',
-    badFormat: 'Vault 백업 파일이 아닙니다. age -d 로 열리는 vault-*.age 파일인지 확인하세요.',
+    badFormat: 'Keys Kept 백업 파일이 아닙니다. age -d 로 열리는 vault-*.age 파일인지 확인하세요.',
     result: (a: number, u: number, s: number) => `복구했습니다. 추가 ${a}개, 갱신 ${u}개, 건너뜀 ${s}개.`,
   },
   sync: {

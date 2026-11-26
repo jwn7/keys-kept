@@ -20,6 +20,7 @@ test('처음 설정 → 복구 키 12단어 → 빈 금고는 .env를 넣으라�
 
 test('약한 비밀번호로는 열쇠를 만들 수 없다', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: /새 금고 만들기/ }).click();
   await page.locator('#pw').fill('password1234');
   await page.locator('#pw2').fill('password1234');
   await page.waitForTimeout(1500);
@@ -197,4 +198,20 @@ test('예전 메모(키가 아닌 항목)는 "프로젝트 없음"에 그대로 
   await page.getByLabel('값', { exact: true }).fill('ssh-staging-secret');
   await page.getByLabel('값', { exact: true }).press('Tab');
   await expect(page.locator('.key-row', { hasText: '서버 메모' })).toBeVisible();
+});
+
+test('첫 화면은 새 금고 만들기와 쓰던 금고 열기로 나뉜다. 쓰던 금고는 이 브라우저에서 되는 길만 보이고, 처음으로 돌아올 수 있다', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Keys Kept 시작하기' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /새 금고 만들기/ })).toBeVisible();
+  await page.getByRole('button', { name: /쓰던 금고 열기/ }).click();
+  await expect(page.getByRole('heading', { name: '쓰던 금고 열기' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Google Drive/ })).toBeVisible(); // 테스트는 클라이언트 ID를 준다
+  await expect(page.getByRole('button', { name: /동기화 폴더/ })).toBeVisible(); // Chrome 데스크톱
+  await page.getByRole('button', { name: /백업 파일/ }).click();
+  await expect(page.getByRole('heading', { name: '백업 파일로 복구' })).toBeVisible();
+  await page.getByRole('button', { name: '뒤로' }).click();
+  await page.getByRole('button', { name: '처음으로' }).click();
+  await expect(page.getByRole('heading', { name: 'Keys Kept 시작하기' })).toBeVisible();
+  await expect(page).toHaveTitle('Keys Kept');
 });

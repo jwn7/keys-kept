@@ -34,6 +34,7 @@ const AI_LOG = [
 
 async function setupVault(page) {
   await page.goto(URL);
+  await page.getByRole('button', { name: /새 금고 만들기/ }).click();
   await page.locator('#pw').fill(PASSWORD);
   await page.locator('#pw2').fill(PASSWORD);
   await page.getByRole('button', { name: '열쇠 만들기' }).click();
@@ -161,6 +162,7 @@ const browser = await chromium.launch({ channel: 'chrome' });
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: scheme, locale: 'ko-KR', isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   await page.goto(URL);
+  await page.getByRole('button', { name: /새 금고 만들기/ }).click();
   await page.locator('#pw').fill(PASSWORD);
   await page.locator('#pw2').fill(PASSWORD);
   await shot(page, 'm-0-setup');

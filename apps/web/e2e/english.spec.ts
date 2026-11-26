@@ -14,7 +14,9 @@ test('브라우저 언어가 영어면 처음 설정과 메인 화면이 영어�
 
   // 처음 설정
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('heading', { name: 'First-time setup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Get started with Keys Kept' })).toBeVisible();
+  await page.getByRole('button', { name: /Create a new vault/ }).click();
+  await expect(page.getByRole('heading', { name: 'Create a new vault' })).toBeVisible();
   await expect(page.getByText('마스터 비밀번호')).toHaveCount(0);
   await page.locator('#pw').fill(PASSWORD);
   await page.locator('#pw2').fill(PASSWORD);

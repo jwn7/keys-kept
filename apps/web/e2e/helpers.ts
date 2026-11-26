@@ -6,6 +6,7 @@ export const PASSWORD = 'e2e 보라색 자전거 달력 소나무';
 /** 처음 설정 → 복구 키 12단어 → 첫 화면(빈 프로젝트 목록) */
 export async function setup(page: Page, password = PASSWORD) {
   await page.goto('/');
+  await page.getByRole('button', { name: /새 금고 만들기/ }).click();
   await page.locator('#pw').fill(password);
   await page.locator('#pw2').fill(password);
   const create = page.getByRole('button', { name: '열쇠 만들기' });

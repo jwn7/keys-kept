@@ -14,6 +14,8 @@ Versions follow [Semantic Versioning](https://semver.org). Before 1.0, a minor b
 - Note-taking features removed to focus on the key ledger: new notes, daily note, templates, calendar and card views, tasks, review. Existing note items stay readable and editable in their project (plan 14-3).
 - Connect tab: link a project to a code folder, keep `.env.<env>.age` files up to date, `.vault.yml`, AI on/off, recent AI use (plan 15).
 - Review fixes: text contrast 4.5:1 in both themes, larger touch targets, view switch as a segmented control, error states.
+- First screen on a new device: "Create a new vault" or "Open an existing vault" (Google Drive, sync folder, backup file), instead of going straight to password setup. If the connected storage is empty, the app says so and offers to create a vault there.
+- The app is named Keys Kept (seal K, icons, page title).
 - License changed from MIT to AGPL-3.0-only (code published before 2026-11-26 stays available under MIT).
 
 ### 0.0.1 (2026-11-07 to 2026-11-25, unreleased development)

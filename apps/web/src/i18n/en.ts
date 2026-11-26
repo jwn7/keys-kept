@@ -11,11 +11,11 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 
 export const en: Strings = {
   app: {
-    name: 'Vault',
+    name: 'Keys Kept',
     tagline: 'Keys, kept.',
     taglineLines: ['Keys,', 'kept.'],
     // The red seal is the logo mark: the first letter of the name, the same in every language. It is hidden from screen readers.
-    sealMark: 'V',
+    sealMark: 'K',
     sees: [
       { label: 'What the server sees', value: 'Item count, modified times, sizes' },
       { label: 'What it cannot see', value: 'Key names and values, projects, where keys are used, notes' },
@@ -59,8 +59,27 @@ export const en: Strings = {
     newPassword: 'New master password',
     setPasswordAndOpen: 'Reset password and open',
   },
+  welcome: {
+    title: 'Get started with Keys Kept',
+    sub: 'There is no account on a company server. You create a vault on a device, and on other devices you bring the same vault over and open it with the same password. You do this once per device; after that you unlock with your password or fingerprint.',
+    create: 'Create a new vault',
+    createHint: 'First time on this device. You choose a master password.',
+    existing: 'Open an existing vault',
+    existingHint: 'Bring over the vault you use on another device and open it with its password.',
+    existingTitle: 'Open an existing vault',
+    existingSub: 'Where did you keep your vault? After it is brought over, open it with your original master password.',
+    fromDrive: 'Google Drive',
+    fromDriveHint: 'If Drive sync was on for your other device',
+    fromFolder: 'Sync folder',
+    fromFolderHint: 'If you kept the ciphertext in a folder such as Dropbox or iCloud (Chrome or Edge on desktop)',
+    fromBackup: 'Backup file (.age)',
+    fromBackupHint: 'Restore from a backup file you exported',
+    back: 'Back to start',
+    emptyStore: 'There is no vault in the connected storage yet. Sync once on your original device and open again, or create a new vault here.',
+    createHere: 'Create a new vault here',
+  },
   setup: {
-    title: 'First-time setup',
+    title: 'Create a new vault',
     sub: 'Choose a master password. It is not stored anywhere, and if you forget it, only the 12-word recovery phrase can get your data back.',
     password: 'Master password',
     confirm: 'Confirm password',
@@ -69,8 +88,6 @@ export const en: Strings = {
     strength: ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'],
     create: 'Create vault key',
     subShort: 'If you forget it, only the 12-word recovery phrase can get your data back.',
-    fromDrive: 'Already have notes on another device? Load them from Google Drive',
-    driveEmpty: 'There is no Vault on this Drive yet. Open the app on your original device, sync once, then try again.',
     step: (n: number, total: number) => `Step ${n} of ${total}`,
     creating: 'Deriving the vault key…',
     phraseTitle: '12-word recovery phrase',
@@ -87,7 +104,7 @@ export const en: Strings = {
     run: 'Restore',
     running: 'Restoring…',
     wrongPass: 'Wrong backup password.',
-    badFormat: 'This is not a Vault backup file. Check that it is a vault-*.age file that opens with age -d.',
+    badFormat: 'This is not a Keys Kept backup file. Check that it is a vault-*.age file that opens with age -d.',
     result: (a: number, u: number, s: number) => `Restored. ${a} added, ${u} updated, ${s} skipped.`,
   },
   sync: {

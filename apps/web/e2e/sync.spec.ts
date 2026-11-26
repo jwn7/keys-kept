@@ -95,6 +95,7 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   await drive.attach(ctxA);
   const a = await ctxA.newPage();
   await a.goto('/');
+  await a.getByRole('button', { name: /새 금고 만들기/ }).click();
   await a.locator('#pw').fill(PASSWORD);
   await a.locator('#pw2').fill(PASSWORD);
   await a.getByRole('button', { name: '열쇠 만들기' }).click();
@@ -121,7 +122,9 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   await drive.attach(ctxB);
   const b = await ctxB.newPage();
   await b.goto('/');
-  await b.getByRole('button', { name: /Google Drive에서 불러오기/ }).click();
+  // 새 기기: 첫 화면에서 '쓰던 금고 열기' → Google Drive (열쇠를 새로 만들지 않는다)
+  await b.getByRole('button', { name: /쓰던 금고 열기/ }).click();
+  await b.getByRole('button', { name: /Google Drive/ }).click();
   await unlock(b); // 같은 비밀번호 → Drive의 감싼 열쇠가 풀린다
   await expect(b.locator('.key-row', { hasText: 'FIRST_DEVICE_KEY' })).toBeVisible();
 
@@ -137,7 +140,8 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   await drive.attach(ctxC);
   const c = await ctxC.newPage();
   await c.goto('/');
-  await c.getByRole('button', { name: /Google Drive에서 불러오기/ }).click();
+  await c.getByRole('button', { name: /쓰던 금고 열기/ }).click();
+  await c.getByRole('button', { name: /Google Drive/ }).click();
   await expect(c.getByRole('heading', { name: '잠금 해제' })).toBeVisible();
   await c.locator('#pw').fill('남의 비밀번호');
   await c.getByRole('button', { name: '열기', exact: true }).click();

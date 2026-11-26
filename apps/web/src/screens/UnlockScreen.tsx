@@ -8,14 +8,16 @@ import { GOOGLE_CLIENT_ID } from '../app/session';
 import { evaluatePasskey } from '../app/passkey';
 import { markInstalled, markUnlock } from '../app/metrics';
 import { Logo } from '../components/Seal';
+import { connectFolder, folderSyncSupported } from '../app/folderSync';
 
-type Mode = 'password' | 'recovery' | 'restore';
+/** welcome·create·existing은 이 기기에 금고가 없을 때(firstRun)만 */
+type Mode = 'password' | 'recovery' | 'restore' | 'welcome' | 'create' | 'existing';
 
 export function UnlockScreen({ firstRun }: { firstRun: boolean }) {
   const app = useApp((s) => s.app);
   const autoLockMin = useApp((s) => s.autoLockMin);
   const setPref = useApp((s) => s.setPref);
-  const [mode, setMode] = useState<Mode>('password');
+  const [mode, setMode] = useState<Mode>(firstRun ? 'welcome' : 'password');
   const [count, setCount] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -51,14 +53,18 @@ export function UnlockScreen({ firstRun }: { firstRun: boolean }) {
         <p className="small muted">{count !== null ? ko.app.localCount(count, lastSync && relTime(lastSync)) : ' '}</p>
       </section>
       <section className="unlock-right">
-        {firstRun && mode !== 'restore' ? (
-          <SetupCard onRestore={() => setMode('restore')} />
+        {firstRun && mode === 'welcome' ? (
+          <WelcomeCard onCreate={() => setMode('create')} onExisting={() => setMode('existing')} />
+        ) : firstRun && mode === 'create' ? (
+          <SetupCard onBack={() => setMode('welcome')} />
+        ) : firstRun && mode === 'existing' ? (
+          <ExistingCard onBackup={() => setMode('restore')} onBack={() => setMode('welcome')} />
         ) : mode === 'password' ? (
           <PasswordCard autoLockMin={autoLockMin} setAutoLock={(m) => setPref('autoLockMin', m)} onRecovery={() => setMode('recovery')} onRestore={() => setMode('restore')} />
         ) : mode === 'recovery' ? (
           <RecoveryCard onBack={() => setMode('password')} />
         ) : (
-          <RestoreCard firstRun={firstRun} onBack={() => setMode('password')} />
+          <RestoreCard firstRun={firstRun} onBack={() => setMode(firstRun ? 'existing' : 'password')} />
         )}
       </section>
     </div>
@@ -90,6 +96,7 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emptyStore, setEmptyStore] = useState(false);
   const [passkey, setPasskey] = useState<{ credentialId: string; prfSalt: string } | null>(null);
   useEffect(() => {
     void app.session.deviceUnlockInfo().then(setPasskey).catch(() => setPasskey(null));
@@ -123,7 +130,10 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
       setPw('');
     } catch (err) {
       if (err instanceof WrongPasswordError) setError(ko.unlock.wrong);
-      else if (err instanceof NotSetUpError) setError(ko.setup.driveEmpty);
+      else if (err instanceof NotSetUpError) {
+        setError(ko.welcome.emptyStore);
+        setEmptyStore(true);
+      }
       else setError(String(err));
     } finally {
       setBusy(false);
@@ -137,6 +147,9 @@ function PasswordCard({ autoLockMin, setAutoLock, onRecovery, onRestore }: { aut
       </div>
       <PasswordField id="pw" label={ko.unlock.password} value={pw} onChange={setPw} placeholder={ko.unlock.passwordPlaceholder} autoFocus />
       {error && <p className="error small" style={{ color: 'var(--danger)' }}>{error}</p>}
+      {emptyStore && (
+        <button type="button" className="btn" onClick={() => useApp.getState().setScreen('setup')}>{ko.welcome.createHere}</button>
+      )}
       <button type="submit" className="btn btn-primary" disabled={!pw || busy} style={{ height: 48 }}>
         {busy ? ko.unlock.deriving : ko.unlock.open}
       </button>
@@ -255,7 +268,7 @@ function PhraseView({ phrase, onAck, step }: { phrase: string[]; onAck: () => vo
   );
 }
 
-function SetupCard({ onRestore }: { onRestore: () => void }) {
+function SetupCard({ onBack }: { onBack: () => void }) {
   const app = useApp((s) => s.app);
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
@@ -298,15 +311,72 @@ function SetupCard({ onRestore }: { onRestore: () => void }) {
         {busy ? ko.setup.creating : ko.setup.create}
       </button>
       <div className="unlock-links">
-        {/* 새 기기: 열쇠를 새로 만들지 않고 Drive의 볼트를 연다. 연결 후 다시 부팅하면 잠금 해제 화면이 뜬다 (bootApp). */}
-        {GOOGLE_CLIENT_ID && app.driveAuth ? (
-          <button type="button" className="btn-link" onClick={() => void app.driveAuth?.connect().then(() => window.location.reload())}>{ko.setup.fromDrive}</button>
-        ) : (
-          <span />
-        )}
-        <button type="button" className="btn-link muted" onClick={onRestore}>{ko.unlock.restoreBackup}</button>
+        <button type="button" className="btn-link muted" onClick={onBack}>{ko.welcome.back}</button>
       </div>
     </form>
+  );
+}
+
+/**
+ * 이 기기에 금고가 없을 때의 첫 화면. 회사 서버에 계정이 없으므로 "가입/로그인" 대신
+ * "새로 만들기 / 쓰던 금고 가져오기"로 나눈다. 둘 다 같은 크기로 보이고, 주 버튼은 하나.
+ */
+function WelcomeCard({ onCreate, onExisting }: { onCreate: () => void; onExisting: () => void }) {
+  return (
+    <div className="unlock-card">
+      <div>
+        <h2>{ko.welcome.title}</h2>
+        <p className="small muted">{ko.welcome.sub}</p>
+      </div>
+      <button type="button" className="btn btn-primary choice" onClick={onCreate}>
+        <span>{ko.welcome.create}</span>
+        <small>{ko.welcome.createHint}</small>
+      </button>
+      <button type="button" className="btn choice" onClick={onExisting}>
+        <span>{ko.welcome.existing}</span>
+        <small>{ko.welcome.existingHint}</small>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * 다른 기기에서 쓰던 금고를 이 기기로. Drive·폴더는 연결한 뒤 다시 부팅하면 그 저장소의 열쇠로 잠금 해제 화면이 뜬다 (store.ts bootApp).
+ * 이 브라우저에서 쓸 수 없는 길은 보이지 않는다(데모에는 Drive가 없다).
+ */
+function ExistingCard({ onBackup, onBack }: { onBackup: () => void; onBack: () => void }) {
+  const app = useApp((s) => s.app);
+  const drive = !!(GOOGLE_CLIENT_ID && app.driveAuth);
+  const folder = folderSyncSupported();
+  const fromFolder = async () => {
+    if (await connectFolder()) window.location.reload();
+  };
+  return (
+    <div className="unlock-card">
+      <div>
+        <h2>{ko.welcome.existingTitle}</h2>
+        <p className="small muted">{ko.welcome.existingSub}</p>
+      </div>
+      {drive && (
+        <button type="button" className="btn choice" onClick={() => void app.driveAuth?.connect().then(() => window.location.reload())}>
+          <span>{ko.welcome.fromDrive}</span>
+          <small>{ko.welcome.fromDriveHint}</small>
+        </button>
+      )}
+      {folder && (
+        <button type="button" className="btn choice" onClick={() => void fromFolder()}>
+          <span>{ko.welcome.fromFolder}</span>
+          <small>{ko.welcome.fromFolderHint}</small>
+        </button>
+      )}
+      <button type="button" className="btn choice" onClick={onBackup}>
+        <span>{ko.welcome.fromBackup}</span>
+        <small>{ko.welcome.fromBackupHint}</small>
+      </button>
+      <div className="unlock-links">
+        <button type="button" className="btn-link muted" onClick={onBack}>{ko.welcome.back}</button>
+      </div>
+    </div>
   );
 }
 

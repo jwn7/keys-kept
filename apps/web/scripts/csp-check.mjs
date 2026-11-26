@@ -23,6 +23,7 @@ if (!policy) throw new Error('CSP meta가 없다. 개발 서버가 아니라 빌
 // 암호화(libsodium wasm), 비밀번호 강도(지연 로딩), 키 편집기(설명 칸의 CodeMirror 스타일 주입)를 한 바퀴 돈다.
 // 화면 흐름은 e2e/helpers.ts와 같다 (2026-11-26 프로젝트 먼저 구조).
 const KEY = ['sk-', 'proj-', 'c'.repeat(48)].join(''); // 가짜 값
+await page.getByRole('button', { name: /새 금고 만들기/ }).click();
 await page.locator('#pw').fill(PASSWORD);
 await page.locator('#pw2').fill(PASSWORD);
 const create = page.getByRole('button', { name: '열쇠 만들기' });
