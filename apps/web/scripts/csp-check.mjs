@@ -20,25 +20,34 @@ await page.goto(base);
 const policy = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
 if (!policy) throw new Error('CSP meta가 없다. 개발 서버가 아니라 빌드 결과(preview)로 열었는지 확인.');
 
-// 암호화(libsodium wasm), 비밀번호 강도(지연 로딩), 편집기(CodeMirror 스타일 주입)를 한 바퀴 돈다
+// 암호화(libsodium wasm), 비밀번호 강도(지연 로딩), 키 편집기(설명 칸의 CodeMirror 스타일 주입)를 한 바퀴 돈다.
+// 화면 흐름은 e2e/helpers.ts와 같다 (2026-11-26 프로젝트 먼저 구조).
+const KEY = ['sk-', 'proj-', 'c'.repeat(48)].join(''); // 가짜 값
 await page.locator('#pw').fill(PASSWORD);
 await page.locator('#pw2').fill(PASSWORD);
-await page.getByRole('button', { name: '열쇠 만들기' }).click();
+const create = page.getByRole('button', { name: '열쇠 만들기' });
+await create.waitFor();
+await page.waitForFunction(() => !document.querySelector('button.btn-primary[disabled]'), null, { timeout: 30_000 }); // zxcvbn 사전을 받은 뒤 켜진다
+await create.click();
 await page.getByRole('button', { name: '적어두었습니다' }).click();
-await page.getByLabel('빠른 메모').fill('정책 점검 메모');
-await page.getByLabel('빠른 메모').press('Enter');
-await page.locator('.note-row', { hasText: '정책 점검 메모' }).click();
+await page.locator('.list-title-row').getByRole('button', { name: '새 프로젝트' }).click();
+await page.getByRole('alertdialog').getByLabel('프로젝트 이름 (예: shop)').fill('csp');
+await page.getByRole('alertdialog').getByRole('button', { name: '확인' }).click();
+await page.getByLabel('빠른 추가').fill(`OPENAI_API_KEY=${KEY}`);
+await page.getByLabel('빠른 추가').press('Enter');
+await page.locator('.key-row', { hasText: 'OPENAI_API_KEY' }).click();
 await page.locator('.cm-content').click();
-await page.keyboard.type('본문 [[링크]] #태그');
+await page.keyboard.type('정책 점검 설명');
 await page.getByRole('button', { name: '잠금', exact: true }).click();
 await page.locator('#pw').fill(PASSWORD);
 await page.getByRole('button', { name: '열기', exact: true }).click();
-await page.locator('.note-row', { hasText: '정책 점검 메모' }).click();
+await page.locator('.key-row', { hasText: 'OPENAI_API_KEY' }).click(); // 프로젝트가 하나라 바로 열린다
+await page.locator('.cm-content', { hasText: '정책 점검 설명' }).waitFor();
 const body = await page.locator('.cm-content').textContent();
 await page.locator('.sidebar').getByRole('button', { name: '설정' }).click();
 await page.locator('#usage').scrollIntoViewIfNeeded();
 const before = [...violations];
-const appOk = before.length === 0 && errors.length === 0 && (body ?? '').includes('본문');
+const appOk = before.length === 0 && errors.length === 0 && (body ?? '').includes('정책 점검 설명');
 
 // 악성 스크립트가 끼어들었다고 치고: 허용 목록 밖으로 보내기, 바깥 스크립트 불러오기, eval
 const blocked = await page.evaluate(async () => {
