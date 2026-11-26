@@ -10,7 +10,7 @@ The user keeps API keys in an encrypted vault. This project folder has encrypted
 ## Tools
 
 - `list_keys` — names of the keys available for the current branch's environment. No values.
-- `run_with_keys` — run a command with the chosen keys injected as environment variables. Output that contains a value comes back with the value replaced by `[NAME 가림]` (masked).
+- `run_with_keys` — run a command with the chosen keys injected as environment variables. Output that contains a value comes back with the value replaced by `[NAME hidden]`.
 - `request_key` — when a needed key is missing, produces the message to show the user. It tells them to add the key in the Vault app, not in the chat.
 
 ## Rules

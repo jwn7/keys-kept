@@ -8,7 +8,7 @@
 const COMMANDS = { run: 'vault-run.mjs', mcp: 'vault-mcp.mjs', check: 'vault-check.mjs', scan: 'vault-scan.mjs', push: 'vault-push.mjs' };
 const [cmd] = process.argv.splice(2, 1);
 if (!cmd || !COMMANDS[cmd]) {
-  console.error(`keys-kept: 명령을 고르세요: ${Object.keys(COMMANDS).join(' | ')}\n  예) npx keys-kept run -- npm run dev\n      npx keys-kept mcp   (Claude Code: claude mcp add keys-kept -e VAULT_ENV_PASSPHRASE=... -- npx -y keys-kept mcp)`);
+  console.error(`keys-kept: choose a command: ${Object.keys(COMMANDS).join(' | ')}\n  e.g. npx keys-kept run -- npm run dev\n       npx keys-kept mcp   (Claude Code: claude mcp add --transport stdio --env VAULT_ENV_PASSPHRASE=... keys-kept -- npx -y keys-kept mcp)`);
   process.exit(cmd ? 2 : 0);
 }
 await import(new URL(`./${COMMANDS[cmd]}`, import.meta.url).href);

@@ -11,7 +11,7 @@ const argv = process.argv.slice(2);
 const opt = (name) => (argv.indexOf(name) >= 0 ? argv[argv.indexOf(name) + 1] : undefined);
 const target = argv[0];
 if (target !== 'github') {
-  console.error('사용법: vault-push github [--file .env.age] [--repo owner/name] [--env 환경이름] [--only A,B] [--dry-run]');
+  console.error('usage: keys-kept push github [--file .env.age] [--repo owner/name] [--env environment] [--only A,B] [--dry-run]');
   process.exit(2);
 }
 const dry = argv.includes('--dry-run');
@@ -29,7 +29,7 @@ try {
 if (only) {
   const missing = only.filter((n) => !entries.some((e) => e.name === n));
   if (missing.length) {
-    console.error(`vault-push: 금고에 없는 이름: ${missing.join(', ')}`);
+    console.error(`push: not in the vault: ${missing.join(', ')}`);
     process.exit(2);
   }
   entries = entries.filter((e) => only.includes(e.name));
@@ -38,22 +38,22 @@ if (only) {
 let failed = 0;
 for (const { name, value } of entries) {
   if (!isGithubSecretName(name)) {
-    console.error(`건너뜀  ${name}  (GitHub 비밀값 이름으로 쓸 수 없습니다: 영문·숫자·밑줄만, GITHUB_ 로 시작 불가)`);
+    console.error(`skipped  ${name}  (not a valid GitHub secret name: letters, digits, underscore; cannot start with GITHUB_)`);
     continue;
   }
   if (dry) {
-    console.log(`올릴 것  ${name}`);
+    console.log(`would set  ${name}`);
     continue;
   }
   const plan = spawnPlan(gh, ghSecretArgs(name, { repo: opt('--repo'), env: opt('--env') }));
   const r = spawnSync(plan.command, plan.args, { input: value, shell: plan.shell, encoding: 'utf8' });
-  if (r.status === 0) console.log(`올림    ${name}`);
+  if (r.status === 0) console.log(`set      ${name}`);
   else {
     failed++;
-    console.error(`실패    ${name}  ${(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+    console.error(`failed   ${name}  ${(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
   }
 }
 if (failed) {
-  console.error(`\nvault-push: ${failed}개를 올리지 못했습니다. \`gh auth status\`로 로그인과 저장소 권한을 확인하세요.`);
+  console.error(`\npush: ${failed} secret(s) failed. Check your login and repository access with \`gh auth status\`.`);
   process.exit(1);
 }

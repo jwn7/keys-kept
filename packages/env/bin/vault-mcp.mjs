@@ -39,29 +39,29 @@ const TIMEOUT_MS = 120_000;
 const MAX_OUTPUT = 20_000;
 
 const TOOLS = [
-  { name: 'list_keys', description: '금고(.env.age)에 있는 키의 이름 목록. 값은 돌려주지 않는다.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'list_keys', description: 'List the names of the keys available in this project (for the current git branch environment). Never returns values.', inputSchema: { type: 'object', properties: {} } },
   {
     name: 'run_with_keys',
-    description: '고른 키의 값을 환경변수로 넣어 명령을 실행한다. 값은 이 대화에 나타나지 않으며, 출력에 값이 찍히면 가려진다. 키 값을 직접 물어보거나 파일에 쓰지 말고 이 도구를 쓴다.',
+    description: 'Run a command with the chosen keys injected as environment variables. Values never appear in this conversation; any value printed in the output is replaced with [NAME hidden]. Use this instead of asking the user for a key or writing it to a file.',
     inputSchema: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: '실행할 프로그램 (예: npm)' },
-        args: { type: 'array', items: { type: 'string' }, description: '인자 (예: ["run", "dev"])' },
-        keys: { type: 'array', items: { type: 'string' }, description: '넣을 키 이름들. list_keys의 이름 그대로' },
-        cwd: { type: 'string', description: '실행할 폴더 (기본: 현재 폴더)' },
+        command: { type: 'string', description: 'Program to run (e.g. npm)' },
+        args: { type: 'array', items: { type: 'string' }, description: 'Arguments (e.g. ["run", "dev"])' },
+        keys: { type: 'array', items: { type: 'string' }, description: 'Key names to inject, exactly as list_keys returns them' },
+        cwd: { type: 'string', description: 'Working directory (default: the project folder)' },
       },
       required: ['command', 'keys'],
     },
   },
-  { name: 'request_key', description: '필요한 키가 금고에 없을 때, 사용자에게 무엇을 넣어 달라고 할지 안내문을 만든다. 값을 채팅에 붙여 넣게 하지 않는다.', inputSchema: { type: 'object', properties: { name: { type: 'string' }, why: { type: 'string' } }, required: ['name'] } },
+  { name: 'request_key', description: 'When a needed key is missing, returns the message to show the user: add it in the Keys Kept app. Never ask the user to paste a value into the chat.', inputSchema: { type: 'object', properties: { name: { type: 'string' }, why: { type: 'string' } }, required: ['name'] } },
 ];
 
 const text = (t, isError = false) => ({ content: [{ type: 'text', text: t }], isError });
 
 async function entries(file) {
   // stdio는 프로토콜이 쓰므로 비밀번호를 물을 수 없다. 환경변수로 받은 것만 쓴다.
-  if (!process.env.VAULT_ENV_PASSPHRASE && !process.env.VAULT_ENV_IDENTITY && !process.env.VAULT_ENV_IDENTITY_FILE) throw new Error('VAULT_ENV_PASSPHRASE 또는 VAULT_ENV_IDENTITY_FILE이 설정되지 않았습니다.');
+  if (!process.env.VAULT_ENV_PASSPHRASE && !process.env.VAULT_ENV_IDENTITY && !process.env.VAULT_ENV_IDENTITY_FILE) throw new Error('Neither VAULT_ENV_PASSPHRASE nor VAULT_ENV_IDENTITY_FILE is set. Ask the user to set one in the shell that starts the AI tool, then restart it. Do not ask for the passphrase in chat.');
   return readEnv(file);
 }
 
@@ -85,7 +85,7 @@ function runCommand(command, args, env, cwd) {
     const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
     child.on('error', (e) => {
       clearTimeout(timer);
-      resolve({ code: 127, out: `실행 실패: ${e.message}` });
+      resolve({ code: 127, out: `failed to start: ${e.message}` });
     });
     child.on('exit', (code) => {
       clearTimeout(timer);
@@ -97,23 +97,23 @@ function runCommand(command, args, env, cwd) {
 async function callTool(name, a = {}) {
   const w = where();
   if (w.cfg && w.cfg.ai === false) {
-    return text('이 프로젝트는 .vault.yml 에서 AI 도구 사용이 꺼져 있습니다 (ai: false). 사용자가 Vault 앱의 연결 탭에서 켤 수 있습니다. 값을 채팅으로 받지 마세요.', true);
+    return text('AI tool access is turned off for this project (ai: false in .vault.yml). The user can turn it on in the Keys Kept app (project > Connect). Do not ask for values in chat.', true);
   }
-  const place = `${w.cfg?.project ?? '이 프로젝트'}${w.env ? ` › ${w.env}` : ''}`;
+  const place = `${w.cfg?.project ?? 'this project'}${w.env ? ` > ${w.env}` : ''}`;
   if (name === 'list_keys') {
     const all = await entries(w.file);
     logUse({ tool: 'list_keys', env: w.env, count: all.length });
-    return text(all.length ? all.map((e) => e.name).join('\n') : '(키 없음)');
+    return text(all.length ? all.map((e) => e.name).join('\n') : '(no keys)');
   }
   if (name === 'request_key') {
     logUse({ tool: 'request_key', keys: [String(a.name)], env: w.env });
-    return text(`금고에 ${a.name} 이(가) 없습니다.${a.why ? ` (${a.why})` : ''}\n사용자에게 이렇게 안내하세요: Vault 앱의 ${place} 에 ${a.name} 을(를) 넣어 주세요. 앱이 이 폴더에 연결돼 있으면 키 파일이 바로 다시 써지고, 아니면 "암호화해서 내려받기"로 ${w.file} 을(를) 바꿔 주세요. 값을 채팅에 붙여 넣지 마세요.`);
+    return text(`${a.name} is not in the vault.${a.why ? ` (${a.why})` : ''}\nTell the user: add ${a.name} to ${place} in the Keys Kept app. If the app is connected to this folder, the key file is rewritten right away; otherwise export it with "Download encrypted" and replace ${w.file}. Do not paste the value into the chat.`);
   }
   if (name === 'run_with_keys') {
-    if (typeof a.command !== 'string' || !Array.isArray(a.keys)) return text('command(문자열)와 keys(배열)가 필요합니다.', true);
+    if (typeof a.command !== 'string' || !Array.isArray(a.keys)) return text('command (string) and keys (array) are required.', true);
     const all = await entries(w.file);
     const missing = a.keys.filter((k) => !all.some((e) => e.name === k));
-    if (missing.length) return text(`금고에 없는 키: ${missing.join(', ')}. list_keys로 이름을 확인하거나 request_key로 사용자에게 요청하세요.`, true);
+    if (missing.length) return text(`Not in the vault: ${missing.join(', ')}. Check names with list_keys, or ask the user with request_key.`, true);
     const env = { ...process.env };
     for (const k of ['VAULT_ENV_PASSPHRASE', 'VAULT_ENV_IDENTITY', 'VAULT_ENV_IDENTITY_FILE']) delete env[k]; // 실행하는 프로그램에는 금고를 여는 것을 넘기지 않는다
     for (const e of all) if (a.keys.includes(e.name)) env[e.name] = e.value;
@@ -122,9 +122,9 @@ async function callTool(name, a = {}) {
     const safe = redact(r.out, all); // 먼저 가리고, 그다음 자른다
     const args = Array.isArray(a.args) ? a.args.map(String) : [];
     logUse({ tool: 'run_with_keys', command: redact([a.command, ...args].join(' '), all).slice(0, 200), keys: a.keys.map(String), redacted: all.filter((e) => e.value.length >= 6 && r.out.includes(e.value)).length, env: w.env, code: r.code });
-    return text(`종료 코드 ${r.code}\n${safe.length > MAX_OUTPUT ? `${safe.slice(0, MAX_OUTPUT)}\n… (잘림)` : safe}`, r.code !== 0);
+    return text(`exit code ${r.code}\n${safe.length > MAX_OUTPUT ? `${safe.slice(0, MAX_OUTPUT)}\n… (truncated)` : safe}`, r.code !== 0);
   }
-  return text(`모르는 도구: ${name}`, true);
+  return text(`unknown tool: ${name}`, true);
 }
 
 const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);

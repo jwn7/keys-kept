@@ -47,7 +47,7 @@ export async function openEnvAge(bytes, passphrase) {
   try {
     text = await d.decrypt(bytes, 'text');
   } catch {
-    throw new Error('비밀번호가 틀렸거나 age 파일이 아닙니다.');
+    throw new Error('Wrong passphrase, or not an age file.');
   }
   return parseEnv(text);
 }
@@ -64,7 +64,7 @@ export async function openEnvAgeWith(bytes, identity) {
   try {
     text = await d.decrypt(bytes, 'text');
   } catch {
-    throw new Error('이 개인키로 열 수 없습니다. 나에게 보낸 파일이 아니거나 age 파일이 아닙니다.');
+    throw new Error('This identity cannot open the file. It was not sealed to you, or it is not an age file.');
   }
   return parseEnv(text);
 }
@@ -80,7 +80,7 @@ export async function readEnv(file) {
   const idFile = process.env.VAULT_ENV_IDENTITY_FILE;
   const identity = idFile ? (await readFile(idFile, 'utf8')).split('\n').find((l) => l.trim().startsWith('AGE-SECRET-KEY-')) : process.env.VAULT_ENV_IDENTITY;
   if (identity) return openEnvAgeWith(bytes, identity);
-  if (idFile) throw new Error(`${idFile} 에 AGE-SECRET-KEY- 로 시작하는 줄이 없습니다.`);
+  if (idFile) throw new Error(`${idFile} has no line starting with AGE-SECRET-KEY-.`);
   return openEnvAge(bytes, await getPassphrase(file));
 }
 
@@ -91,7 +91,7 @@ export async function readEnv(file) {
 export function redact(text, entries) {
   let out = text;
   for (const { name, value } of [...entries].sort((a, b) => b.value.length - a.value.length)) {
-    if (value.length >= 6) out = out.split(value).join(`[${name} 가림]`);
+    if (value.length >= 6) out = out.split(value).join(`[${name} hidden]`);
   }
   return out;
 }
@@ -110,7 +110,7 @@ export function needsShell(command) {
  * `%이름%`은 따옴표 안에서도 cmd가 환경변수로 바꾼다. 막을 방법이 없어 그런 인자는 거절한다.
  */
 export function winQuote(arg) {
-  if (/%[^%]+%/.test(arg)) throw new Error(`인자에 %이름% 꼴이 있어 Windows 셸에서 안전하게 넘길 수 없습니다: ${arg}`);
+  if (/%[^%]+%/.test(arg)) throw new Error(`An argument contains %NAME%, which cannot be passed safely through the Windows shell: ${arg}`);
   return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
 }
 
@@ -124,7 +124,7 @@ export function spawnPlan(command, args) {
 export function promptHidden(question) {
   return new Promise((resolve, reject) => {
     const { stdin, stderr } = process;
-    if (!stdin.isTTY) return reject(new Error('비밀번호를 물을 터미널이 없습니다. VAULT_ENV_PASSPHRASE 환경변수로 넘기세요.'));
+    if (!stdin.isTTY) return reject(new Error('No terminal to ask for the passphrase. Set the VAULT_ENV_PASSPHRASE environment variable.'));
     stderr.write(question);
     stdin.setRawMode(true);
     stdin.resume();
@@ -140,7 +140,7 @@ export function promptHidden(question) {
     const onData = (chunk) => {
       for (const ch of chunk) {
         if (ch === '\r' || ch === '\n') return done(() => resolve(buf));
-        if (ch === '\u0003') return done(() => reject(new Error('취소했습니다.'))); // Ctrl+C
+        if (ch === '\u0003') return done(() => reject(new Error('Cancelled.'))); // Ctrl+C
         if (ch === '\u007f' || ch === '\b') buf = buf.slice(0, -1);
         else buf += ch;
       }
@@ -151,7 +151,7 @@ export function promptHidden(question) {
 
 /** 비밀번호: VAULT_ENV_PASSPHRASE가 있으면 그것, 없으면 터미널에서 묻는다. */
 export async function getPassphrase(file) {
-  return process.env.VAULT_ENV_PASSPHRASE || promptHidden(`${file} 비밀번호: `);
+  return process.env.VAULT_ENV_PASSPHRASE || promptHidden(`Passphrase for ${file}: `);
 }
 
 /** 풀어서 process.env에 넣는다. 이미 있는 이름은 덮어쓰지 않는다(배포 환경이 정한 값이 우선). 넣은 이름 목록을 돌려준다. */

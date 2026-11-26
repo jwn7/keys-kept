@@ -14,10 +14,10 @@ const cmd = sep >= 0 ? argv.slice(sep + 1) : argv.slice(lead);
 const fileAt = opts.indexOf('--file');
 // 파일을 안 주면: .vault.json의 브랜치 → 환경 규칙으로 .env.<환경>.age 를 고르고, 없으면 .env.age
 const { file, env: branchEnv } = resolveEnvFile({ file: fileAt >= 0 ? opts[fileAt + 1] : undefined });
-if (branchEnv) console.error(`vault-run: 지금 브랜치의 환경은 ${branchEnv}`);
+if (branchEnv) console.error(`run: using the ${branchEnv} environment for this branch`);
 
 if (cmd.length === 0 || !file) {
-  console.error('사용법: vault-run [--file .env.age] -- <명령> [인자…]\n예:     vault-run -- npm run dev');
+  console.error('usage: keys-kept run [--file .env.age] -- <command> [args...]\ne.g.   keys-kept run -- npm run dev');
   process.exit(2);
 }
 
@@ -42,7 +42,7 @@ try {
 }
 const child = spawn(plan.command, plan.args, { stdio: 'inherit', env, shell: plan.shell });
 child.on('error', (e) => {
-  console.error(`vault-run: ${cmd[0]} 실행 실패: ${e.message}`);
+  console.error(`run: failed to start ${cmd[0]}: ${e.message}`);
   process.exit(127);
 });
 child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

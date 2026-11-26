@@ -19,7 +19,7 @@ if (given.length === 0) {
   try {
     staged = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACM'], { encoding: 'utf8' }).split('\0').filter(Boolean);
   } catch {
-    console.error('vault-scan: git 저장소가 아닙니다. 검사할 파일을 직접 주세요.');
+    console.error('scan: not a git repository. Pass the files to check.');
     process.exit(2);
   }
 }
@@ -41,15 +41,15 @@ for (const f of files) {
     text = readTarget(f);
   } catch (e) {
     // 못 읽은 파일을 "깨끗함"으로 넘기지 않는다
-    console.error(`vault-scan: ${f} 을(를) 읽지 못했습니다: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
+    console.error(`scan: could not read ${f}: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
     process.exit(2);
   }
   for (const leak of findLeaks(text, entries)) {
     found++;
-    console.error(`${f}:${leak.line}  ${leak.name} 의 값이 들어 있습니다`);
+    console.error(`${f}:${leak.line}  ${leak.name}  (its value is on this line)`);
   }
 }
 if (found) {
-  console.error(`\nvault-scan: 금고의 값 ${found}곳. 커밋하면 저장소에 남습니다. 값을 빼고 환경변수로 읽도록 고치세요.`);
+  console.error(`\nscan: ${found} place(s) contain a value from the vault. Once committed, it stays in history. Remove the value and read it from an environment variable.`);
   process.exit(1);
 }

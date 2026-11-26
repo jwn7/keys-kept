@@ -26,5 +26,6 @@ Encryption core, sync (Drive, folder, Supabase Pro), age backups, key ledger (re
 - `.vault.yml` (`project`, `ai`, `branches`, `required`); `.vault.json` still read.
 - MCP server picks the key file by git branch, refuses when `ai: false`, logs key names (never values) to `.vault/ai-log.jsonl`.
 - Empty `VAULT_ENV_PASSPHRASE` counts as unset.
+- All CLI and MCP messages are in English; masked output reads `[NAME hidden]`.
 - Claude Code plugin `keys-kept` (MCP server + skill) and `server.json` for the MCP registry.
 - License: MIT.

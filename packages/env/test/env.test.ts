@@ -43,7 +43,7 @@ describe('암호화된 .env (age)', () => {
 
   it('redact: 값이 찍힌 곳을 이름으로 가린다. 짧은 값은 그대로 둔다', () => {
     const out = redact(`key=${SECRET} url=postgres://u:p@host/db n=1`, [...ENTRIES, { name: 'N', value: '1' }]);
-    expect(out).toBe('key=[OPENAI_API_KEY 가림] url=[DATABASE_URL 가림] n=1');
+    expect(out).toBe('key=[OPENAI_API_KEY hidden] url=[DATABASE_URL hidden] n=1');
   });
 });
 
@@ -103,7 +103,7 @@ describe('vault-mcp: AI에게 이름만 주고 값은 주지 않는다', () => {
     const all = JSON.stringify(r);
     expect(all).not.toContain(SECRET); // 어떤 응답에도 값이 없다
     expect(r[1]!.result!.content![0]!.text.split('\n')).toEqual(['OPENAI_API_KEY', 'DATABASE_URL', 'MULTI']);
-    expect(r[2]!.result!.content![0]!.text).toContain('got [OPENAI_API_KEY 가림] / none'); // 고른 키만 들어갔다
+    expect(r[2]!.result!.content![0]!.text).toContain('got [OPENAI_API_KEY hidden] / none'); // 고른 키만 들어갔다
     expect(r[3]!.result!.isError).toBe(true);
   }, 30_000);
 });
