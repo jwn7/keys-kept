@@ -21,16 +21,20 @@ Password managers and team secret managers answer "where do I store this safely"
 ```bash
 # Paste a .env into the app, then export it encrypted (a standard age file).
 # Run without a plaintext .env on disk:
-node packages/env/bin/vault-run.mjs -- npm run dev
+npx keys-kept run -- npm run dev
 
 # Fail fast if the vault is missing something the code needs:
-node packages/env/bin/vault-check.mjs            # compares with .env.example
+npx keys-kept check            # .vault.yml `required` and .env.example
 
 # Block a commit that contains one of your actual key values:
-node packages/env/bin/vault-scan.mjs
+npx keys-kept scan
 
 # Push to GitHub Actions secrets through your own gh login:
-node packages/env/bin/vault-push.mjs github --repo me/app --dry-run
+npx keys-kept push github --repo me/app --dry-run
+
+# Let Claude Code use keys by name (MCP server + skill):
+#   /plugin marketplace add jwn7/vault-notes
+#   /plugin install keys-kept@vault-notes
 ```
 In the app, `Ctrl K`, a few letters of the key name, and `Enter` copies the value. `Shift Enter` copies `NAME=value`.
 
@@ -62,7 +66,8 @@ No cryptographic primitives are implemented in this repository. The threat model
 ## Repository layout
 ```
 packages/core   encryption, local store, sync engine, backup, key ledger logic (no UI; runs in browser and Node)
-packages/env    Node helpers: vault-run, vault-check, vault-scan, vault-push, MCP server (plain JS, no build step)
+packages/env    npm package keys-kept: run, check, scan, push, MCP server, .vault.yml (plain JS, no build step)
+plugins/        Claude Code plugin keys-kept (MCP server + skill)
 apps/web        React + Vite PWA
 supabase/       optional hosted backend
 docs/           spec, data model, design, strategy, security, team sharing (mostly Korean)
@@ -75,4 +80,8 @@ Working: the ledger, key recognition, `.env` import and export, environment comp
 Not done: an external security review, a packaged desktop or mobile build, live shared projects for teams, OS keychain integration for the Node helpers.
 
 ## License
-MIT. See [LICENSE](LICENSE).
+- **App and core** (`apps/`, `packages/core`, `supabase/`): [AGPL-3.0-only](LICENSE). You may use, study, and modify it. If you run a modified version as a network service, you must offer its source to your users.
+- **`keys-kept`** (`packages/env`, the npm package) and the **Claude Code plugin** (`plugins/keys-kept`): [MIT](packages/env/LICENSE), so you can use them in any project, including commercial and closed-source ones.
+- Code published before 2026-11-26 was released under MIT and stays available under MIT.
+
+Versions and release notes: [CHANGELOG.md](CHANGELOG.md). How releases are cut: [docs/RELEASING.md](docs/RELEASING.md).

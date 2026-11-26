@@ -29,7 +29,8 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 ## 모노레포 구조
 ```
 packages/core      암호화 · 로컬 저장 · 동기화 엔진 · 백업 (UI 없음, 브라우저/Node 공용)
-packages/env       암호화된 .env.age를 풀어 쓰는 Node 패키지: vault-run, 한 줄 로더, AI 도구용 MCP 서버 (순수 JS, 빌드 없음)
+packages/env       npm 패키지 `keys-kept`: 암호화된 .env.age를 풀어 쓰는 명령(run·check·scan·push), 한 줄 로더, AI 도구용 MCP 서버, `.vault.yml` 읽기 (순수 JS, 빌드 없음)
+plugins/keys-kept  Claude Code 플러그인 (MCP 서버 + 스킬). 마켓플레이스 파일은 루트 `.claude-plugin/marketplace.json`
 apps/web           React + Vite PWA (PC와 모바일 브라우저)
 apps/desktop       Tauri 2 래퍼 (2단계) — apps/web을 그대로 감쌈
 apps/mobile        Tauri 2 Android/iOS (3단계)

@@ -6,8 +6,8 @@
 
 - 키를 붙여 넣으면 어느 서비스의 무슨 키인지 알아보고, 브라우저에 공개되는 이름(`NEXT_PUBLIC_`, `VITE_`)에 비밀 키를 넣으면 경고한다.
 - 꺼내 쓰기: `Ctrl+K` → 이름 → Enter로 복사. `.env` 통째로 넣고 꺼내기.
-- 평문 `.env` 없이 실행: `vault-run -- npm run dev` (`packages/env`).
-- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버, `packages/env`).
+- 평문 `.env` 없이 실행: `npx keys-kept run -- npm run dev` (npm 패키지 `keys-kept`, 코드는 `packages/env`).
+- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버 `npx keys-kept mcp`. Claude Code는 `/plugin marketplace add jwn7/vault-notes` → `/plugin install keys-kept@vault-notes`).
 - 사고 모드: 털린 기기나 프로젝트를 고르면 바꿔야 할 키 체크리스트가 나온다.
 - 환경 비교표: 키를 행, 환경을 열로 놓고 한 환경에만 빠진 값을 찾는다.
 - 개발 흐름 연결(`packages/env`): 깃 브랜치 → 환경, `.env.example` 대조(`vault-check`), 커밋 전 유출 검사(`vault-scan`), GitHub Actions로 올리기(`vault-push`).
@@ -60,4 +60,8 @@ pnpm --filter web dev   # http://localhost:5173
 못 막는 것: 잠금 해제된 기기의 악성코드, 약한 비밀번호, 메타데이터(메모 수·크기·수정 시각), 사용자가 평문으로 내보낸 파일.
 
 ## 라이선스
-MIT. [LICENSE](LICENSE) 참고.
+- **앱과 core** (`apps/`, `packages/core`, `supabase/`): [AGPL-3.0-only](LICENSE). 쓰고, 읽고, 고칠 수 있습니다. 고친 버전을 네트워크 서비스로 운영하면 사용자에게 그 소스를 공개해야 합니다.
+- **`keys-kept`** (`packages/env`, npm 패키지)와 **Claude Code 플러그인** (`plugins/keys-kept`): [MIT](packages/env/LICENSE). 상업용·비공개 프로젝트를 포함해 어디서든 쓸 수 있습니다.
+- 2026-11-26 이전에 공개된 코드는 MIT로 배포됐고, 그 버전은 계속 MIT로 쓸 수 있습니다.
+
+버전과 바뀐 점: [CHANGELOG.md](CHANGELOG.md). 배포하는 방법: [docs/RELEASING.md](docs/RELEASING.md).
