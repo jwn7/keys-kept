@@ -24,16 +24,20 @@ test('브라우저 언어가 영어면 처음 설정과 메인 화면이 영어�
   await expect(page.locator('.phrase-grid span')).toHaveCount(12);
   await page.getByRole('button', { name: 'I wrote it down' }).click();
 
-  // 메인
-  await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible();
+  // 메인: 빈 프로젝트 목록
+  await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Drop the .env file you use here' })).toBeVisible();
   await expect(page.locator('.sidebar .badge')).toHaveText('Local only');
-  await expect(page.locator('.sidebar').getByRole('button', { name: 'All notes' })).toBeVisible();
-  const quick = page.getByLabel('Quick note');
-  await quick.fill('tomorrow rotate the staging key'); // 영어 날짜 말도 일정이 된다
+  await expect(page.locator('.sidebar').getByRole('button', { name: 'All projects' })).toBeVisible();
+  await page.locator('.list-title-row').getByRole('button', { name: 'New project' }).click();
+  await page.getByRole('alertdialog').getByLabel('Project name (e.g. shop)').fill('shop');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'OK' }).click();
+  const quick = page.getByLabel('Quick add');
+  await quick.fill('STAGING_KEY=staging-value-123');
   await quick.press('Enter');
-  await page.locator('.sidebar').getByRole('button', { name: 'All notes' }).click();
-  await expect(page.locator('.note-row', { hasText: 'rotate the staging key' })).toBeVisible();
-  await expect(page.locator('.note-row', { hasText: 'tomorrow' })).toHaveCount(0);
+  await expect(page.locator('.key-row', { hasText: 'STAGING_KEY' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Keys 1' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Connect' })).toBeVisible();
 
   // 설정에서 한국어로 → 새로 고쳐져 잠금 화면이 한국어로 나온다
   await page.locator('.sidebar').getByRole('button', { name: 'Settings' }).click();

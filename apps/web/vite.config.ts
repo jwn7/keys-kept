@@ -35,7 +35,11 @@ function csp(mode: string): Plugin {
   };
 }
 
+/** 배포 주소의 기준 경로. GitHub Pages 데모는 https://<사용자>.github.io/<저장소>/ 라서 VITE_BASE=/<저장소>/ (.github/workflows/pages.yml) */
+const BASE = process.env.VITE_BASE || '/';
+
 export default defineConfig(({ mode }) => ({
+  base: BASE,
   plugins: [
     react(),
     csp(mode),
@@ -43,28 +47,28 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Vault — Keys, kept.',
-        short_name: 'Vault',
+        name: 'Keys Kept',
+        short_name: 'Keys Kept',
         description: 'API 키와 환경변수를 기기에서 잠그는 키 장부',
         lang: 'ko',
-        start_url: '/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         background_color: '#FFFFFF',
         theme_color: '#FFFFFF',
         // 설치한 앱 아이콘을 길게 누르면(PC는 우클릭) 나오는 바로가기. 주소에 메모 내용은 넣지 않는다.
         shortcuts: [
-          { name: '새 메모', url: '/?action=new' },
-          { name: '오늘의 메모', url: '/?action=today' },
+          { name: '새 키', url: `${BASE}?action=new` },
         ],
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: `${BASE}icon-192.png`, sizes: '192x192', type: 'image/png' },
+          { src: `${BASE}icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
       workbox: {
         // 앱 셸은 프리캐시. 글꼴은 한글 묶음 파일이 수백 개라 미리 받지 않고, 쓰인 묶음만 받아 캐시에 둔다.
         globPatterns: ['**/*.{js,css,html,svg,png}'],
-        navigateFallback: '/index.html',
+        navigateFallback: `${BASE}index.html`,
         runtimeCaching: [
           { urlPattern: ({ url, sameOrigin }) => sameOrigin && /\.woff2?$/.test(url.pathname), handler: 'CacheFirst', options: { cacheName: 'fonts', expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 365 } } },
         ],

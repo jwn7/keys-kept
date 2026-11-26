@@ -5,7 +5,7 @@ PC(웹/Tauri)와 모바일(Android 우선)에서 같은 코드를 쓴다. 상세
 
 ## 현재 상태
 - 0~4단계 완료: core(crypto/store/sync/backup/session, 테스트 162개) + `apps/web` PWA(잠금·메인·편집기·팔레트·설정·모바일). Drive 연결은 `apps/web/.env`의 `VITE_GOOGLE_CLIENT_ID`가 필요. 6단계 Pro(`SupabaseBackend`, `put_item` RPC, `backup-mail` Edge Function, 앱의 Pro 전환 `apps/web/src/pro/`)도 코드 완료. 남은 것은 외부 작업: Google OAuth 등록, Tauri Android 빌드(`docs/MOBILE.md`), Supabase 적용·배포, Play 등록.
-- 왜 쓰는가·KPI·자동으로 도와주는 것: `docs/KPI.md` (오늘 화면, 할 일 모음, 날짜 말, 관련 메모, 복습은 `apps/web/src/app/assist.ts`의 순수 함수)
+- 왜 쓰는가·KPI: `docs/KPI.md`. 화면 구조는 프로젝트 먼저(첫 화면 = 프로젝트 목록, 프로젝트마다 키/연결 탭). 메모·일정·할 일·복습 기능은 2026-11-26에 뺐다(`docs/STRATEGY.md` 계획 14). 프로젝트 목록·.vault.yml·AI 기록 계산은 `apps/web/src/app/projectConfig.ts`, 코드 폴더 연결은 `apps/web/src/app/codeLink.ts`
 - **방향과 계획은 `docs/STRATEGY.md` 하나가 정한다** (다른 문서와 다르면 그 문서가 맞다). 이 앱은 1인 개발자·바이브코더를 위한 **키 장부**(API 키·환경변수·계정 정보)다. 지금 하는 일은 그 문서의 계획 순서. 계획에 없는 기능은 끼워 넣지 않고, 넣으려면 그 문서부터 고친다
 - 공격별 대응과 제안 중인 방어: `docs/SECURITY.md` (배포 빌드에는 CSP가 있다. 새 외부 주소에 연결하려면 `apps/web/vite.config.ts`의 허용 목록에 이유와 함께 추가)
 - 와이어프레임·최종 디자인: `docs/WIREFRAMES.md`, 토큰·규칙: `docs/DESIGN.md` (UI 작업 전 필독)
@@ -41,9 +41,11 @@ docs/              스펙 · 데이터 모델 · 아키텍처 · 로드맵
 ## 명령
 - `pnpm i` / `pnpm -r test` / `pnpm --filter core test --watch`
 - `pnpm --filter web dev` (localhost:5173)
-- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 22개: 패스키는 가상 인증기, 자동 백업은 가상 폴더, 두 기기 동기화는 가짜 Drive)
+- `pnpm --filter @vault/web e2e` (Playwright, 설치된 Chrome 사용. 화면 흐름 24개: 패스키는 가상 인증기, 자동 백업·코드 폴더 연결은 가상 폴더(OPFS), 두 기기 동기화는 가짜 Drive)
 - `node apps/web/scripts/csp-check.mjs` (배포 빌드의 CSP 점검, `pnpm --filter @vault/web preview` 필요)
 - `node apps/web/scripts/shots.mjs <폴더> [light|dark]` (디자인 검토용 화면 캡처, 개발 서버 필요)
+- 웹 데모 빌드: `VITE_BASE=/<저장소>/ VITE_DEMO=1 pnpm --filter @vault/web build` (GitHub Pages는 `.github/workflows/pages.yml`이 한다)
+- 배포와 버전: `docs/RELEASING.md` (앱은 AGPL-3.0-only, `keys-kept`와 플러그인은 MIT)
 - `supabase start` / `supabase db reset` (Pro 모듈 작업 시)
 
 ## 작업 순서 (새 기능)

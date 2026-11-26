@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Note } from '@vault/core';
 import { backupsToDelete } from './autoBackup';
-import { searchNotes, searchScore, dayKey, formatDay, monthGrid, noteDay, backlinkIndex, charCount, matchSnippet, passwordScore, relTime, snippet, todayTitle, wikiLinks } from './util';
+import { searchNotes, searchScore, dayKey, formatDay, charCount, matchSnippet, passwordScore, relTime, snippet, todayTitle } from './util';
 
 const note = (id: string, title: string, body: string): Note => ({
   id, title, body, tags: [], folder: null, pinned: false,
@@ -27,18 +27,6 @@ describe('passwordScore', () => {
     expect(passwordScore('abc123')).toBeLessThan(3);
     expect(passwordScore('purple bicycle calendar pine')).toBeGreaterThanOrEqual(3);
     expect(passwordScore('Tr0ub4dor&3xyz!!')).toBeGreaterThanOrEqual(3);
-  });
-});
-
-describe('wikiLinks / backlinkIndex', () => {
-  it('[[제목]]과 [[제목|별칭]]을 추출하고 자기 참조는 제외', () => {
-    expect(wikiLinks('a [[장보기]] b [[회의|m]] [[장보기]]')).toEqual(['장보기', '회의']);
-    const a = note('a', '장보기', '우유');
-    const b = note('b', '주말', '[[장보기]] 가기');
-    const c = note('c', '메모', '[[메모]] 자기 자신');
-    const idx = backlinkIndex([a, b, c]);
-    expect(idx.get('a')?.map((n) => n.id)).toEqual(['b']);
-    expect(idx.get('c')).toBeUndefined();
   });
 });
 
@@ -73,23 +61,7 @@ describe('검색', () => {
   });
 });
 
-describe('캘린더 날짜', () => {
-  it('monthGrid: 2026년 11월은 일요일 11/1부터, 42칸', () => {
-    const g = monthGrid(2026, 10);
-    expect(g).toHaveLength(42);
-    expect(g[0]).toBe('2026-11-01');
-    expect(g[41]).toBe('2026-12-12');
-  });
-  it('monthGrid: 1일이 수요일이면 앞 칸은 지난달', () => {
-    expect(monthGrid(2026, 6)[0]).toBe('2026-06-28');
-  });
-  it('noteDay: 일정 날짜 > 날짜 제목 > 없음, 작성일 기준은 로컬 날짜', () => {
-    const base = { title: '치과', createdAt: new Date(2026, 10, 3, 23, 30).toISOString() };
-    expect(noteDay({ ...base, date: '2026-11-24' }, 'date')).toBe('2026-11-24');
-    expect(noteDay({ ...base, title: '2026-11-05' }, 'date')).toBe('2026-11-05');
-    expect(noteDay(base, 'date')).toBeNull();
-    expect(noteDay(base, 'created')).toBe('2026-11-03');
-  });
+describe('날짜', () => {
   it('formatDay / dayKey', () => {
     expect(formatDay('2026-11-24')).toBe('11월 24일 (화)');
     expect(dayKey(new Date(2026, 0, 5))).toBe('2026-01-05');

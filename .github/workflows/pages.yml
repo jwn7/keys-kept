@@ -1,0 +1,50 @@
+name: pages
+# 웹 데모: main에 올라온 앱을 GitHub Pages에 배포한다. 서버가 없는 앱이라 정적 파일만 올리면 된다.
+# 데모에는 Google Drive 연결이 없다(VITE_GOOGLE_CLIENT_ID를 넣지 않는다). 데이터는 방문자의 브라우저 안에만 있다.
+# 처음 한 번, 저장소 Settings > Pages > Source를 "GitHub Actions"로 바꿔야 한다(사람이 한다).
+on:
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'packages/core/**', 'pnpm-lock.yaml', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+# 액션은 커밋 해시로 고정한다 (ci.yml과 같은 이유). 배포 작업만 pages·id-token 권한을 받는다.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 주소가 https://<사용자>.github.io/<저장소>/ 라서 앱의 기준 경로를 저장소 이름으로 맞춘다 (저장소 이름을 바꿔도 따라간다)
+      - run: pnpm --filter @vault/web build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_DEMO: '1'
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

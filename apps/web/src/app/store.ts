@@ -7,22 +7,26 @@ import { markOpen } from './metrics';
 import { ui } from './ui';
 import { ko } from '../i18n/ko';
 
-export type Filter = { kind: 'today' } | { kind: 'keys' } | { kind: 'incident' } | { kind: 'all' } | { kind: 'dated' } | { kind: 'folder'; folder: string | null } | { kind: 'tag'; tag: string } | { kind: 'trash' };
-export type SortKey = 'updated' | 'created' | 'title';
+/**
+ * 가운데 화면. 잠금을 풀면 프로젝트 목록이 먼저다 (docs/STRATEGY.md 계획 14).
+ * project: null은 프로젝트를 정하지 않은 항목들("프로젝트 없음").
+ */
+export type Filter = { kind: 'projects' } | { kind: 'attention' } | { kind: 'incident' } | { kind: 'project'; project: string | null } | { kind: 'trash' };
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 's' | 'm' | 'l';
 export type Screen = 'loading' | 'setup' | 'unlock' | 'main' | 'settings';
 export type MobileView = 'list' | 'editor';
 export type EditorWidth = 'narrow' | 'normal' | 'wide';
-export type ViewMode = 'list' | 'cards' | 'calendar';
-export type CalBasis = 'date' | 'created';
+export type ProjectTab = 'keys' | 'connect';
+export type ProjectView = 'list' | 'compare';
 
-type Prefs = { theme: Theme; fontSize: FontSize; autoLockMin: number; sort: SortKey; editorWidth: EditorWidth; view: ViewMode; calBasis: CalBasis };
+type Prefs = { theme: Theme; fontSize: FontSize; autoLockMin: number; editorWidth: EditorWidth };
 const PREFS_KEY = 'vault.prefs';
 function loadPrefs(): Prefs {
-  const d: Prefs = { theme: 'system', fontSize: 'm', autoLockMin: 15, sort: 'updated', editorWidth: 'normal', view: 'list', calBasis: 'date' };
+  const d: Prefs = { theme: 'system', fontSize: 'm', autoLockMin: 15, editorWidth: 'normal' };
   try {
-    return { ...d, ...(JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>) };
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>;
+    return { theme: saved.theme ?? d.theme, fontSize: saved.fontSize ?? d.fontSize, autoLockMin: saved.autoLockMin ?? d.autoLockMin, editorWidth: saved.editorWidth ?? d.editorWidth };
   } catch {
     return d;
   }
@@ -35,6 +39,12 @@ function savePrefs(p: Prefs) {
   }
 }
 
+/**
+ * 마지막에 연 프로젝트. 프로젝트 이름도 장부 내용이라 itemsKey로 잠가(sealLocal) 둔다. 잠금을 풀어야 읽힌다.
+ * 빈 문자열 = "프로젝트 없음".
+ */
+const LAST_PROJECT_KEY = 'vault.lastProject';
+
 export type AppState = Prefs & {
   app: AppSession;
   screen: Screen;
@@ -44,7 +54,6 @@ export type AppState = Prefs & {
   status: SyncStatus;
   selectedId: string | null;
   filter: Filter;
-  query: string;
   paletteOpen: boolean;
   mobileView: MobileView;
   /** 제목·본문에 커서가 있는 동안 true. 모바일 상단의 `완료`(키보드 내리기)를 이때만 보여준다. */
@@ -56,31 +65,36 @@ export type AppState = Prefs & {
    * 잠그면 사라진다: 값을 디스크에 남기지 않는다.
    */
   incident: { by: { place: string } | { project: string | null }; initial: Record<string, string>; done: string[] } | null;
-  /** 프로젝트 화면을 환경 비교표로 보기 */
-  compare: boolean;
-  /** .env 넣기 창. text는 붙여 넣은 내용(없으면 빈 창) */
-  envImport: { text: string } | null;
-  /** 캘린더가 보여주는 달 `YYYY-MM`과 고른 날 */
-  calMonth: string;
-  calDay: string | null;
+  /** 프로젝트 화면의 탭(키 / 연결)과 키 탭의 보기(목록 / 환경 비교) */
+  projectTab: ProjectTab;
+  projectView: ProjectView;
+  /** 마지막에 연 프로젝트 (undefined = 없음). 프로젝트 목록에서 맨 앞에 둔다 */
+  lastProject: string | null | undefined;
+  /** .env 넣기 창. text는 붙여 넣은 내용(없으면 빈 창), env는 파일 이름에서 짐작한 환경 */
+  envImport: { text: string; env?: string | null; project?: string | null } | null;
   lastBackupAt: string | null;
   // actions
   setScreen(s: Screen): void;
   select(id: string | null): void;
   setFilter(f: Filter): void;
-  setQuery(q: string): void;
   setPalette(open: boolean): void;
   setMobileView(v: MobileView): void;
   setEditing(v: boolean): void;
   setEnvFilter(e: string | null): void;
-  setEnvImport(v: { text: string } | null): void;
+  setEnvImport(v: AppState['envImport']): void;
   setIncident(v: AppState['incident']): void;
-  setCompare(v: boolean): void;
-  setCal(c: { month?: string; day?: string | null }): void;
+  setProjectTab(t: ProjectTab): void;
+  setProjectView(v: ProjectView): void;
   setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void;
   setLastBackup(at: string): void;
   refresh(): void;
 };
+
+/** 잠금을 푼 뒤 첫 화면: 프로젝트가 하나뿐이면 그 프로젝트, 아니면 프로젝트 목록. */
+export function firstFilter(notes: Note[]): Filter {
+  const projects = new Set(notes.map((n) => n.folder));
+  return projects.size === 1 ? { kind: 'project', project: [...projects][0]! } : { kind: 'projects' };
+}
 
 export const useApp = create<AppState>((set, get) => {
   const app = createAppSession();
@@ -90,6 +104,15 @@ export const useApp = create<AppState>((set, get) => {
     if (session.isLocked) return { locked: true, notes: [], trash: [] };
     return { locked: false, notes: session.list(), trash: session.listDeleted() };
   };
+  const readLastProject = (): string | null | undefined => {
+    try {
+      const sealed = localStorage.getItem(LAST_PROJECT_KEY);
+      const v = sealed ? app.session.openLocal(sealed) : null;
+      return v === null ? undefined : v === '' ? null : v;
+    } catch {
+      return undefined;
+    }
+  };
   app.session.subscribe((e) => {
     if (e.type === 'status') set({ status: e.status });
     else if (e.type === 'notes') set(pull());
@@ -98,7 +121,18 @@ export const useApp = create<AppState>((set, get) => {
     else if (e.type === 'lock') {
       // setup 화면은 복구 문구를 보여준 뒤 스스로 main으로 넘어간다.
       const screen = e.locked ? 'unlock' : get().screen === 'setup' ? 'setup' : 'main';
-      set({ ...pull(), screen, selectedId: e.locked ? null : get().selectedId, paletteOpen: false, ...(e.locked ? { incident: null, envImport: null } : {}) });
+      const data = pull();
+      set({
+        ...data,
+        screen,
+        selectedId: null,
+        paletteOpen: false,
+        envFilter: null,
+        projectTab: 'keys',
+        projectView: 'list',
+        mobileView: 'list',
+        ...(e.locked ? { incident: null, envImport: null, lastProject: undefined, filter: { kind: 'projects' } } : { filter: firstFilter(data.notes), lastProject: readLastProject() }),
+      });
       if (e.locked) app.scheduler.stop();
       else {
         markOpen();
@@ -128,34 +162,44 @@ export const useApp = create<AppState>((set, get) => {
     trash: [],
     status: app.backendKind !== 'memory' ? { state: 'offline', pending: 0 } : { state: 'synced', at: '' },
     selectedId: null,
-    filter: { kind: 'today' }, // 첫 화면은 오늘 (docs/KPI.md)
-    query: '',
+    filter: { kind: 'projects' }, // 첫 화면은 프로젝트 목록 (docs/STRATEGY.md 계획 14)
     paletteOpen: false,
     mobileView: 'list',
     editing: false,
     envFilter: null,
     envImport: null,
     incident: null,
-    compare: false,
-    calMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
-    calDay: null,
+    projectTab: 'keys',
+    projectView: 'list',
+    lastProject: undefined,
     lastBackupAt: last,
     setScreen: (screen) => set({ screen }),
     select: (selectedId) => set({ selectedId, mobileView: selectedId ? 'editor' : 'list' }),
-    setFilter: (filter) => set({ filter, mobileView: 'list', envFilter: null, compare: false }),
-    setQuery: (query) => set({ query }),
+    setFilter: (filter) => {
+      const prev = get().filter;
+      const sameProject = filter.kind === 'project' && prev.kind === 'project' && prev.project === filter.project;
+      set({ filter, mobileView: 'list', ...(sameProject ? {} : { envFilter: null, projectTab: 'keys' as const, projectView: 'list' as const }) });
+      if (filter.kind === 'project' && !app.session.isLocked) {
+        set({ lastProject: filter.project });
+        try {
+          localStorage.setItem(LAST_PROJECT_KEY, app.session.sealLocal(filter.project ?? ''));
+        } catch {
+          /* 저장하지 못하면 다음에 순서만 기억하지 못한다 */
+        }
+      }
+    },
     setPalette: (paletteOpen) => set({ paletteOpen }),
     setMobileView: (mobileView) => set({ mobileView }),
     setEditing: (editing) => set({ editing }),
     setEnvFilter: (envFilter) => set({ envFilter }),
     setEnvImport: (envImport) => set({ envImport }),
     setIncident: (incident) => set({ incident }),
-    setCompare: (compare) => set({ compare }),
-    setCal: ({ month, day }) => set((s) => ({ calMonth: month ?? (day ? day.slice(0, 7) : s.calMonth), calDay: day !== undefined ? day : s.calDay })),
+    setProjectTab: (projectTab) => set({ projectTab }),
+    setProjectView: (projectView) => set({ projectView }),
     setPref: (k, v) => {
       set({ [k]: v } as Partial<AppState>);
       const s = get();
-      savePrefs({ theme: s.theme, fontSize: s.fontSize, autoLockMin: s.autoLockMin, sort: s.sort, editorWidth: s.editorWidth, view: s.view, calBasis: s.calBasis });
+      savePrefs({ theme: s.theme, fontSize: s.fontSize, autoLockMin: s.autoLockMin, editorWidth: s.editorWidth });
     },
     setLastBackup: (at) => {
       set({ lastBackupAt: at });

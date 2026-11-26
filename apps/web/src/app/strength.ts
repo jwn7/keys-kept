@@ -21,6 +21,15 @@ function load(): Promise<Checker> {
   return loading;
 }
 
+/** 파일을 잠그는 비밀번호가 쓸 만한가 (점수 3 이상). 사전을 못 받으면(오프라인 첫 실행) 간이 추정으로. */
+export async function strongEnough(pw: string): Promise<boolean> {
+  try {
+    return (await strongScore(pw)) >= 3;
+  } catch {
+    return passwordScore(pw) >= 3;
+  }
+}
+
 export async function strongScore(pw: string): Promise<number> {
   if (!pw) return 0;
   // 아주 긴 입력은 앞부분만 본다 (계산 시간 제한)

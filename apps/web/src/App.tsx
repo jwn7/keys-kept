@@ -3,6 +3,7 @@ import { bootApp, lockNow, useApp } from './app/store';
 import { DialogHost } from './components/DialogHost';
 import { Logo } from './components/Seal';
 import { startAutoLock } from './app/autoLock';
+import { clearLinks, loadLinks, notesChanged } from './app/codeLink';
 import { UnlockScreen } from './screens/UnlockScreen';
 import { MainScreen } from './screens/MainScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -47,6 +48,23 @@ export function App() {
     if (locked || autoLockMin <= 0) return;
     return startAutoLock(autoLockMin, () => void lockNow());
   }, [locked, autoLockMin, app]);
+
+  // 코드 폴더 연결 (docs/STRATEGY.md 계획 15): 잠금을 풀면 연결을 읽고, 키가 바뀌면 그 폴더의 키 파일을 다시 쓴다
+  useEffect(() => {
+    if (locked) {
+      clearLinks();
+      return;
+    }
+    let alive = true;
+    void loadLinks(app).then(() => alive && notesChanged(app, () => useApp.getState().notes));
+    const off = useApp.subscribe((s, prev) => {
+      if (s.notes !== prev.notes && !s.locked) notesChanged(app, () => useApp.getState().notes);
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [locked, app]);
 
   // Realtime 백엔드(Pro)가 있으면 변경 알림 → 동기화
   useEffect(() => {

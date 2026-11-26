@@ -565,6 +565,8 @@ function changeLang(next: Lang) {
   window.location.reload();
 }
 
+const SOURCE_URL = 'https://github.com/jwn7/vault-notes';
+
 function LookSection() {
   const theme = useApp((s) => s.theme);
   const fontSize = useApp((s) => s.fontSize);
@@ -597,6 +599,8 @@ function LookSection() {
           {(['ko', 'en'] as const).map((t) => <button key={t} type="button" lang={t} aria-pressed={lang === t} onClick={() => changeLang(t)}>{S.look.languages[t]}</button>)}
         </div>
       </div>
+      {/* AGPL-3.0 13조: 네트워크로 쓰는 사람도 소스를 받을 수 있어야 한다 */}
+      <p className="small muted">{S.source} <a href={SOURCE_URL} target="_blank" rel="noreferrer">{SOURCE_URL.replace('https://', '')}</a> · AGPL-3.0</p>
     </section>
   );
 }

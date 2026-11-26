@@ -19,26 +19,6 @@ export function dayKey(d: Date): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * 캘린더에 놓일 날짜. basis 'date' = 일정 날짜(없으면 제목이 `YYYY-MM-DD`인 오늘의 메모), 'created' = 작성일.
- * 해당 날짜가 없으면 null (캘린더에 나오지 않는다).
- */
-export function noteDay(n: Pick<Note, 'title' | 'createdAt'> & { date?: string | null }, basis: 'date' | 'created'): string | null {
-  if (basis === 'created') return dayKey(new Date(n.createdAt));
-  if (n.date && DAY_RE.test(n.date)) return n.date;
-  const t = n.title.trim();
-  return DAY_RE.test(t) ? t : null;
-}
-
-/** 월 달력 6주 × 7일. 일요일 시작. month는 0-11 */
-export function monthGrid(year: number, month: number): string[] {
-  const first = new Date(year, month, 1);
-  const start = new Date(year, month, 1 - first.getDay());
-  return Array.from({ length: 42 }, (_, i) => dayKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
-}
-
 /** `2026-11-24` → `11월 24일 (화)` (영어: `Tue, Nov 24`) */
 export function formatDay(key: string): string {
   const [y, m, d] = key.split('-').map(Number) as [number, number, number];
@@ -120,31 +100,6 @@ export function charCount(body: string): number {
 
 export function displayTitle(n: Pick<Note, 'title'>): string {
   return n.title.trim() || ko.main.untitled;
-}
-
-/** [[제목]] 링크 추출 */
-export function wikiLinks(body: string): string[] {
-  const out = new Set<string>();
-  for (const m of body.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)) out.add((m[1] ?? '').trim());
-  out.delete('');
-  return [...out];
-}
-
-/** 백링크 인덱스: 제목 → 그 제목을 링크하는 메모 id[] (기기에서 계산, SPEC §2.2) */
-export function backlinkIndex(notes: Note[]): Map<string, Note[]> {
-  const byTitle = new Map<string, Note>();
-  for (const n of notes) if (n.title.trim()) byTitle.set(n.title.trim(), n);
-  const idx = new Map<string, Note[]>();
-  for (const n of notes) {
-    for (const t of wikiLinks(n.body)) {
-      const target = byTitle.get(t);
-      if (!target || target.id === n.id) continue;
-      const arr = idx.get(target.id) ?? [];
-      if (!arr.some((x) => x.id === n.id)) arr.push(n);
-      idx.set(target.id, arr);
-    }
-  }
-  return idx;
 }
 
 export function downloadBytes(name: string, bytes: Uint8Array, type = 'application/octet-stream'): void {

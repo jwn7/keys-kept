@@ -38,7 +38,8 @@ function idb(): Promise<IDBDatabase> {
     req.onerror = () => reject(req.error);
   });
 }
-async function kv<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+/** 이 앱의 작은 IndexedDB 저장소(`vault-web`/`kv`). 폴더 핸들처럼 localStorage에 못 두는 값을 둔다. */
+export async function kv<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const db = await idb();
   try {
     return await new Promise<T>((resolve, reject) => {

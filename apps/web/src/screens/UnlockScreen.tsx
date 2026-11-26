@@ -45,6 +45,8 @@ export function UnlockScreen({ firstRun }: { firstRun: boolean }) {
               </div>
             ))}
           </dl>
+          {/* 웹 데모(GitHub Pages)에서만: 누구나 들어오는 주소라 진짜 키를 넣지 않게 먼저 말한다 */}
+          {import.meta.env.VITE_DEMO === '1' && <p className="demo-note" role="note">{ko.app.demoNote}</p>}
         </div>
         <p className="small muted">{count !== null ? ko.app.localCount(count, lastSync && relTime(lastSync)) : ' '}</p>
       </section>

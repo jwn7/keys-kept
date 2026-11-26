@@ -1,110 +1,48 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { extractTags, envForProject, type Note } from '@vault/core';
-import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, ExportMenu, IncidentView, ShareDialog, envsOf, EnvImportDialog, projectEnvText } from './KeyViews';
-import { flushEditor, lockNow, useApp, type Filter } from '../app/store';
+import { envForProject, isSecret } from '@vault/core';
+import { CompareTable, copySecret, downloadProjectEnv, downloadSealedEnv, ExportMenu, IncidentView, ShareDialog, EnvImportDialog, projectEnvText } from './KeyViews';
+import { flushEditor, lockNow, useApp, type AppState, type Filter } from '../app/store';
 import { ko } from '../i18n/ko';
-import { backlinkIndex, searchScore, searchTokens, todayTitle } from '../app/util';
-import { StatusBadge } from '../components/StatusBadge';
-import { AlertIcon, BackIcon, CalendarIcon, FolderIcon, GearIcon, KeyIcon, LockIcon, NotesIcon, PlusIcon, SearchIcon, TagIcon, TodayIcon, TrashIcon } from '../components/Icons';
-import { CalendarView, CardGrid, NoteRow, QuickAdd, TodayView } from './NoteViews';
+import { dayKey } from '../app/util';
+import { envsOf, issueCounts, projectSummaries } from '../app/projectConfig';
 import { markCapture } from '../app/metrics';
+import { StatusBadge } from '../components/StatusBadge';
+import { AlertIcon, BackIcon, FolderIcon, GearIcon, GridIcon, LockIcon, PlusIcon, SearchIcon, TodayIcon, TrashIcon } from '../components/Icons';
+import { AttentionView, NoteRow, ProjectKeyList, ProjectsView, QuickAdd, newProject, projectLabel } from './ProjectViews';
+import { ConnectView } from './ConnectView';
 import { Logo } from '../components/Seal';
 import { Editor } from './Editor';
 import { CommandPalette } from './CommandPalette';
 
-export function useFilteredNotes(): Note[] {
-  const notes = useApp((s) => s.notes);
-  const trash = useApp((s) => s.trash);
-  const filter = useApp((s) => s.filter);
-  const sort = useApp((s) => s.sort);
-  const query = useApp((s) => s.query);
-  const envFilter = useApp((s) => s.envFilter);
-  return useMemo(() => {
-    let list: Note[];
-    switch (filter.kind) {
-      case 'today':
-        list = notes;
-        break;
-      case 'keys':
-        list = notes.filter((n) => !!n.secret);
-        break;
-      case 'incident':
-        list = [];
-        break;
-      case 'all': // 메모만. 키는 '모든 키'와 프로젝트에서 본다
-        list = notes.filter((n) => !n.secret);
-        break;
-      case 'dated':
-        list = notes.filter((n) => !!n.date);
-        break;
-      case 'folder':
-        list = notes.filter((n) => n.folder === filter.folder);
-        break;
-      case 'tag':
-        list = notes.filter((n) => n.tags.includes(filter.tag));
-        break;
-      case 'trash':
-        list = trash;
-        break;
-    }
-    // 환경을 고르면 그 환경의 키와 공통 키만 (메모는 그대로 둔다)
-    if (envFilter) list = list.filter((n) => !n.secret || n.secret.env === null || n.secret.env === envFilter);
-    const tokens = searchTokens(query);
-    if (tokens.length) list = list.filter((n) => searchScore(n, tokens) > 0);
-    // 일정: 가까운 날짜부터
-    if (filter.kind === 'dated') return [...list].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
-    const cmp = (a: Note, b: Note) => {
-      if (filter.kind !== 'trash' && a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (sort === 'title') return a.title.localeCompare(b.title, 'ko');
-      const ka = sort === 'created' ? a.createdAt : a.updatedAt;
-      const kb = sort === 'created' ? b.createdAt : b.updatedAt;
-      return kb.localeCompare(ka);
-    };
-    return [...list].sort(cmp);
-  }, [notes, trash, filter, sort, query, envFilter]);
+/** 지금 보고 있는 프로젝트 (프로젝트 화면이 아니면 undefined) */
+export const currentProject = (f: Filter): string | null | undefined => (f.kind === 'project' ? f.project : undefined);
+
+/**
+ * 가운데 열을 넓게 쓰는 화면: 프로젝트 목록, 연결 탭, 환경 비교표.
+ * 이때 편집기는 고른 키가 있을 때만 오른쪽에 열린다.
+ */
+export function isWide(s: Pick<AppState, 'filter' | 'projectTab' | 'projectView'>): boolean {
+  return s.filter.kind === 'projects' || (s.filter.kind === 'project' && (s.projectTab === 'connect' || s.projectView === 'compare'));
 }
 
-/** 새 메모 / 오늘의 메모 / 제목으로 열기 — 팔레트·단축키·링크가 공유 */
-export function useNoteActions() {
+/** 새 키 / 잠금 / 동기화 — 팔레트·단축키·단추가 같이 쓴다 */
+export function useActions() {
   const app = useApp((s) => s.app);
-  const select = useApp((s) => s.select);
-  const setFilter = useApp((s) => s.setFilter);
   return {
-    async newNote(initial?: Partial<Pick<Note, 'title' | 'body' | 'folder' | 'date'>>) {
-      const filter = useApp.getState().filter;
-      const folder = initial?.folder ?? (filter.kind === 'folder' ? filter.folder : null);
-      const body = initial?.body ?? '';
-      markCapture('new');
-      const n = await app.session.save({ title: initial?.title ?? '', body, folder, date: initial?.date ?? null, tags: extractTags(body) });
-      if (filter.kind === 'trash') setFilter({ kind: 'all' });
-      select(n.id);
-      return n;
-    },
     /** 빈 키 항목을 만들어 연다. 프로젝트 화면이면 그 프로젝트에, 환경을 골라 뒀으면 그 환경으로. */
     async newKey() {
-      const { filter, envFilter } = useApp.getState();
+      const { filter, envFilter, setFilter, setProjectTab, select } = useApp.getState();
+      const project = currentProject(filter) ?? null;
       markCapture('new');
-      const n = await app.session.save({ title: '', folder: filter.kind === 'folder' ? filter.folder : null, secret: { value: '', env: envFilter, usedIn: [] } });
-      if (filter.kind === 'trash' || filter.kind === 'all' || filter.kind === 'dated' || filter.kind === 'tag') setFilter({ kind: 'keys' });
+      const n = await app.session.save({ title: '', folder: project, secret: { value: '', env: filter.kind === 'project' ? envFilter : null, usedIn: [] } });
+      if (filter.kind !== 'project' || filter.project !== project) setFilter({ kind: 'project', project });
+      setProjectTab('keys');
       select(n.id);
       return n;
     },
-    async openByTitle(title: string) {
-      const found = useApp.getState().notes.find((n) => n.title.trim() === title.trim());
-      if (found) {
-        select(found.id);
-        return found;
-      }
-      return this.newNote({ title });
-    },
-    async today() {
-      return this.openByTitle(todayTitle());
-    },
-    /** 틀에서 새 메모: 회의록(누가 무엇을), 하루 계획(오늘 일정으로), 학습 노트(#복습 → 다시 볼 메모) */
-    async template(kind: keyof typeof ko.templates) {
-      const now = new Date();
-      const t = ko.templates[kind];
-      return this.newNote({ title: t.title(ko.time.date(now.getMonth() + 1, now.getDate())), body: t.body, date: kind === 'plan' ? todayTitle(now) : null });
+    importEnv() {
+      const { filter, setEnvImport } = useApp.getState();
+      setEnvImport({ text: '', project: currentProject(filter) ?? null });
     },
     lock() {
       void lockNow(); // 미저장 입력을 먼저 저장한 뒤 잠근다
@@ -123,10 +61,9 @@ export function MainScreen() {
   const mobileView = useApp((s) => s.mobileView);
   const selectedId = useApp((s) => s.selectedId);
   const editing = useApp((s) => s.editing);
-  const view = useApp((s) => s.view);
-  const isToday = useApp((s) => s.filter.kind === 'today' || s.filter.kind === 'incident');
-  const comparing = useApp((s) => s.compare && s.filter.kind === 'folder');
-  const actions = useNoteActions();
+  const filter = useApp((s) => s.filter);
+  const wide = useApp(isWide);
+  const actions = useActions();
 
   // 전역 단축키 (SPEC §2.3)
   useEffect(() => {
@@ -135,7 +72,7 @@ export function MainScreen() {
       // 브라우저 탭에서는 Ctrl+N이 새 창으로 가로채인다. Alt+N은 어디서나 동작한다.
       if (e.altKey && !e.ctrlKey && !e.metaKey && k === 'n') {
         e.preventDefault();
-        void actions.newNote();
+        void actions.newKey();
         return;
       }
       const mod = e.ctrlKey || e.metaKey;
@@ -143,12 +80,6 @@ export function MainScreen() {
       if (k === 'k') {
         e.preventDefault();
         setPalette(!useApp.getState().paletteOpen);
-      } else if (k === 'n') {
-        e.preventDefault();
-        void actions.newNote();
-      } else if (k === 'd') {
-        e.preventDefault();
-        void actions.today();
       } else if (k === 'l') {
         e.preventDefault();
         actions.lock();
@@ -158,31 +89,36 @@ export function MainScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, []); // 마운트 시 1회
 
-
-  // 앱 아이콘 바로가기(/?action=new|today): 잠금을 푼 뒤 한 번 실행하고 주소에서 지운다
+  // 앱 아이콘 바로가기(/?action=new): 잠금을 푼 뒤 한 번 실행하고 주소에서 지운다
   useEffect(() => {
     const action = new URLSearchParams(window.location.search).get('action');
-    if (action !== 'new' && action !== 'today') return;
+    if (!action) return;
     window.history.replaceState(null, '', window.location.pathname);
-    if (action === 'new') void actions.newNote();
-    else void actions.today();
+    if (action === 'new') void actions.newKey();
   }, []); // 마운트 시 1회
 
-  // 모바일 편집 화면의 상단 바: 뒤로 + 상태 + 완료만 (DESIGN.md 모바일 상단 바)
+  // 모바일 상단 바: 왼쪽은 이동(뒤로 + 목적지 이름), 오른쪽은 이 화면의 작업 (DESIGN.md 모바일 상단 바)
   const mobileEditing = mobileView === 'editor' && !!selectedId;
+  const project = currentProject(filter);
 
   return (
     <div className="main">
       {/* 모바일 전용 상단 바. PC에는 가로 바가 없다: 내비게이션이 내용보다 튀지 않게 사이드바로 모았다. */}
       <header className="topbar mobile-only">
         <div className="left">
-          {mobileEditing && (
+          {mobileEditing ? (
             <button type="button" className="back-btn" aria-label={ko.main.backToList} onClick={() => useApp.getState().setMobileView('list')}>
               <BackIcon />
-              {ko.main.backToListShort}
+              {project !== undefined ? projectLabel(project) : ko.main.backToListShort}
             </button>
+          ) : filter.kind !== 'projects' ? (
+            <button type="button" className="back-btn" aria-label={ko.main.backToProjects} onClick={() => useApp.getState().setFilter({ kind: 'projects' })}>
+              <BackIcon />
+              {ko.main.backToProjectsShort}
+            </button>
+          ) : (
+            <StatusBadge status={status} local={app.backendKind === 'memory'} compact />
           )}
-          <StatusBadge status={status} local={app.backendKind === 'memory'} />
         </div>
         <div className="right">
           {!mobileEditing && (
@@ -191,7 +127,7 @@ export function MainScreen() {
               <span>{ko.main.search}</span>
             </button>
           )}
-          {/* 왼쪽 `목록`은 이동, 오른쪽 `완료`는 이 화면의 작업(키보드 내리고 저장). 같은 곳으로 가는 버튼을 두 개 두지 않는다. */}
+          {/* 왼쪽은 이동, 오른쪽 `완료`는 이 화면의 작업(키보드 내리고 저장). 같은 곳으로 가는 버튼을 두 개 두지 않는다. */}
           {mobileEditing && editing && (
             <button
               type="button"
@@ -212,9 +148,9 @@ export function MainScreen() {
           )}
         </div>
       </header>
-      <div className="columns" data-view={mobileView} data-mode={comparing ? 'cards' : isToday ? 'list' : view} data-selected={selectedId ? 'true' : 'false'}>
+      <div className="columns" data-view={mobileView} data-mode={wide ? 'wide' : 'list'} data-selected={selectedId ? 'true' : 'false'}>
         <Sidebar />
-        <NoteList />
+        <Center />
         <Editor />
       </div>
       {paletteOpen && <CommandPalette />}
@@ -243,7 +179,7 @@ function EnvImportHost() {
   const envImport = useApp((s) => s.envImport);
   const filter = useApp((s) => s.filter);
   if (!envImport) return null;
-  return <EnvImportDialog initialText={envImport.text} project={filter.kind === 'folder' ? filter.folder : null} onClose={() => useApp.getState().setEnvImport(null)} />;
+  return <EnvImportDialog initialText={envImport.text} project={envImport.project !== undefined ? envImport.project : (currentProject(filter) ?? null)} env={envImport.env} onClose={() => useApp.getState().setEnvImport(null)} />;
 }
 
 function Sidebar() {
@@ -251,25 +187,14 @@ function Sidebar() {
   const status = useApp((s) => s.status);
   const notes = useApp((s) => s.notes);
   const trash = useApp((s) => s.trash);
-  const filter = useApp((s) => s.filter);
-  const setFilter = useApp((s) => s.setFilter);
   const setScreen = useApp((s) => s.setScreen);
   const setPalette = useApp((s) => s.setPalette);
-  const actions = useNoteActions();
-  const folders = useMemo(() => {
-    const m = new Map<string | null, number>();
-    for (const n of notes) m.set(n.folder, (m.get(n.folder) ?? 0) + 1);
-    const named = [...m.entries()].filter(([f]) => f !== null).sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ko')) as [string, number][];
-    return { named, none: m.get(null) ?? 0 };
-  }, [notes]);
-  const tags = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const n of notes) for (const t of n.tags) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
-  }, [notes]);
-  const now = new Date();
+  const actions = useActions();
+  const today = dayKey(new Date());
+  const projects = useMemo(() => projectSummaries(notes, today), [notes, today]);
+  const attention = useMemo(() => issueCounts(notes, today).keys, [notes, today]);
   return (
-    <nav className="sidebar" aria-label={ko.main.folders}>
+    <nav className="sidebar" aria-label={ko.main.projects}>
       <div className="side-head">
         <Logo />
       </div>
@@ -278,22 +203,12 @@ function Sidebar() {
         <span>{ko.main.search}</span>
         <kbd>Ctrl K</kbd>
       </button>
-      <button type="button" className="nav-item" aria-current={filter.kind === 'today' ? 'true' : undefined} onClick={() => setFilter({ kind: 'today' })}>
-        <TodayIcon />
-        <span>{ko.main.home}</span>
-        <span className="count">{ko.time.date(now.getMonth() + 1, now.getDate())}</span>
-      </button>
-      <Item f={{ kind: 'keys' }} label={ko.main.allKeys} count={notes.filter((n) => n.secret).length || undefined} icon={<KeyIcon />} />
-      <Item f={{ kind: 'all' }} label={ko.main.allNotes} count={notes.filter((n) => !n.secret).length} icon={<NotesIcon />} />
-      <Item f={{ kind: 'dated' }} label={ko.main.dated} count={notes.filter((n) => n.date).length || undefined} icon={<CalendarIcon />} />
-      {folders.named.length > 0 && <div className="label">{ko.main.folders}</div>}
-      {folders.named.map(([f, c]) => (
-        <Item key={f} f={{ kind: 'folder', folder: f }} label={f} count={c} icon={<FolderIcon />} />
-      ))}
-      {folders.none > 0 && folders.named.length > 0 && <Item f={{ kind: 'folder', folder: null }} label={ko.main.noFolder} count={folders.none} icon={<FolderIcon />} />}
-      {tags.length > 0 && <div className="label">{ko.main.tags}</div>}
-      {tags.map(([t, c]) => (
-        <Item key={t} f={{ kind: 'tag', tag: t }} label={t} count={c} icon={<TagIcon />} />
+      <Item f={{ kind: 'projects' }} label={ko.main.allProjects} count={projects.length || undefined} icon={<GridIcon />} />
+      <Item f={{ kind: 'attention' }} label={ko.main.attention} count={attention || undefined} icon={<TodayIcon />} />
+      <div className="label">{ko.main.projects}</div>
+      {projects.length === 0 && <div className="side-empty">{ko.main.noProjectsYet}</div>}
+      {projects.map((p) => (
+        <Item key={p.name ?? ''} f={{ kind: 'project', project: p.name }} label={projectLabel(p.name)} count={p.keys + p.plain} icon={<FolderIcon />} />
       ))}
       <div className="spacer" />
       <Item f={{ kind: 'incident' }} label={ko.main.incident} icon={<AlertIcon />} />
@@ -315,87 +230,110 @@ function Sidebar() {
   );
 }
 
-function NoteList() {
-  const list = useFilteredNotes();
-  const notes = useApp((s) => s.notes);
+/** 가운데 열: 고른 화면의 제목줄과 내용 */
+function Center() {
   const filter = useApp((s) => s.filter);
-  const setFilter = useApp((s) => s.setFilter);
-  const sort = useApp((s) => s.sort);
-  const view = useApp((s) => s.view);
-  const setPref = useApp((s) => s.setPref);
-  const query = useApp((s) => s.query);
-  const setQuery = useApp((s) => s.setQuery);
+  const notes = useApp((s) => s.notes);
   const setScreen = useApp((s) => s.setScreen);
-  const actions = useNoteActions();
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  const folders = useMemo(() => [...new Set(notes.map((n) => n.folder).filter((f): f is string => f !== null))].sort((a, b) => a.localeCompare(b, 'ko')), [notes]);
-  // 모바일에는 사이드바가 없어서 태그도 칩으로 고른다 (많이 쓴 순 8개)
-  const topTags = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const n of notes) for (const t of n.tags) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
-  }, [notes]);
+  const actions = useActions();
+  const project = currentProject(filter);
   const title =
-    filter.kind === 'folder' ? (filter.folder ?? ko.main.noFolder) : filter.kind === 'tag' ? `#${filter.tag}` : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'dated' ? ko.main.dated : filter.kind === 'today' ? ko.main.home : filter.kind === 'keys' ? ko.main.allKeys : filter.kind === 'incident' ? ko.main.incident : ko.main.allNotes;
-  const inTrash = filter.kind === 'trash';
-  const isIncident = filter.kind === 'incident';
-  const isToday = filter.kind === 'today';
-  const home = isToday || filter.kind === 'all';
-  const envFilter = useApp((s) => s.envFilter);
-  const setEnvFilter = useApp((s) => s.setEnvFilter);
-  const setEnvImport = useApp((s) => s.setEnvImport);
-  // 키를 넣는 화면: 오늘, 모든 키, 프로젝트
-  const keyScreen = isToday || filter.kind === 'keys' || filter.kind === 'folder';
-  const compare = useApp((s) => s.compare) && filter.kind === 'folder';
-  const setCompare = useApp((s) => s.setCompare);
-  const noList = isToday || isIncident || compare; // 목록 대신 자기 화면을 그리는 곳: 보기 방식·정렬을 숨긴다
-  const project = filter.kind === 'folder' ? filter.folder : null;
-  const envs = useMemo(() => (filter.kind === 'folder' ? envsOf(notes, project) : []), [notes, filter.kind, project]);
-  const projectHasKeys = filter.kind === 'folder' && notes.some((n) => n.secret && n.folder === project);
-  const [sharing, setSharing] = useState(false);
-  const copyEnv = async () => {
-    const r = await projectEnvText(notes, project, envFilter);
-    if (r) await copySecret(r.text, ko.keys.copiedEnv(envForProject(notes, { project, env: r.env }).length));
-  };
+    filter.kind === 'project' ? projectLabel(filter.project) : filter.kind === 'trash' ? ko.main.trash : filter.kind === 'attention' ? ko.main.attention : filter.kind === 'incident' ? ko.main.incident : ko.projects.title;
+  const onProjects = filter.kind === 'projects';
 
   return (
     <section className="list" aria-label={title}>
       <div className="list-top">
         <div className="list-title-row">
           <h1 className="list-title">{title}</h1>
-          <button type="button" className="btn btn-sm mobile-only" onClick={() => setScreen('settings')}>{ko.main.settings}</button>
-          {filter.kind !== 'keys' && !inTrash && !isIncident && (
-            <button type="button" className={`btn btn-sm desktop-only${keyScreen ? '' : ' btn-primary'}`} onClick={() => void actions.newNote()} title="Alt+N">
+          {onProjects && <button type="button" className="btn btn-sm mobile-only" onClick={() => setScreen('settings')}>{ko.main.settings}</button>}
+          {onProjects && notes.length > 0 && (
+            <button type="button" className="btn btn-sm desktop-only" onClick={() => actions.importEnv()}>{ko.keys.importOpen}</button>
+          )}
+          {onProjects && (
+            <button type="button" className={`btn btn-sm desktop-only${notes.length > 0 ? ' btn-primary' : ''}`} onClick={() => void newProject()}>
               <PlusIcon />
-              {ko.main.newNote}
+              {ko.projects.newProject}
             </button>
           )}
-          {keyScreen && (
-            <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newKey()}>
+          {project !== undefined && (
+            <button type="button" className="btn btn-primary btn-sm desktop-only" onClick={() => void actions.newKey()} title="Alt+N">
               <PlusIcon />
               {ko.main.newKey}
             </button>
           )}
         </div>
-        {!inTrash && !isIncident && <QuickAdd />}
-        <div className="folder-chips">
-          <button type="button" aria-pressed={isToday} onClick={() => setFilter({ kind: 'today' })}>{ko.main.home}</button>
-          <button type="button" aria-pressed={filter.kind === 'keys'} onClick={() => setFilter({ kind: 'keys' })}>{ko.main.allKeys}</button>
-          <button type="button" aria-pressed={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })}>{ko.main.allNotes}</button>
-          <button type="button" aria-pressed={filter.kind === 'dated'} onClick={() => setFilter({ kind: 'dated' })}>{ko.main.dated}</button>
-          {folders.map((f) => (
-            <button key={f} type="button" aria-pressed={filter.kind === 'folder' && filter.folder === f} onClick={() => setFilter({ kind: 'folder', folder: f })}>{f}</button>
-          ))}
-          {topTags.map((t) => (
-            <button key={`#${t}`} type="button" aria-pressed={filter.kind === 'tag' && filter.tag === t} onClick={() => setFilter({ kind: 'tag', tag: t })}>#{t}</button>
-          ))}
-          <button type="button" aria-pressed={inTrash} onClick={() => setFilter({ kind: 'trash' })}>{ko.main.trash}</button>
+        {project !== undefined && <ProjectHead project={project} />}
+      </div>
+      <div className="list-scroll">
+        {filter.kind === 'projects' ? (
+          <ProjectsView />
+        ) : filter.kind === 'attention' ? (
+          <AttentionView />
+        ) : filter.kind === 'incident' ? (
+          <IncidentView />
+        ) : filter.kind === 'trash' ? (
+          <TrashList />
+        ) : (
+          <ProjectBody project={filter.project} />
+        )}
+      </div>
+      {(onProjects || project !== undefined) && (
+        <div className="fab-bar">
+          <button type="button" className="btn btn-primary fab" onClick={() => void (onProjects ? newProject() : actions.newKey())}>
+            + {onProjects ? ko.projects.newProject : ko.main.newKey}
+          </button>
         </div>
-        {keyScreen && !isIncident && (
+      )}
+    </section>
+  );
+}
+
+function TrashList() {
+  const trash = useApp((s) => s.trash);
+  const list = useMemo(() => [...trash].sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? '')), [trash]);
+  if (list.length === 0) return <div className="empty">{ko.main.emptyTrash}</div>;
+  return (
+    <>
+      <p className="small muted list-note">{ko.main.trashHint}</p>
+      {list.map((n) => (
+        <NoteRow key={n.id} n={n} showProject />
+      ))}
+    </>
+  );
+}
+
+/** 프로젝트 화면 머리: 탭(키 / 연결), 키 탭이면 빠른 추가와 환경·보기·넣기·꺼내기 */
+function ProjectHead({ project }: { project: string | null }) {
+  const notes = useApp((s) => s.notes);
+  const tab = useApp((s) => s.projectTab);
+  const setTab = useApp((s) => s.setProjectTab);
+  const view = useApp((s) => s.projectView);
+  const setView = useApp((s) => s.setProjectView);
+  const envFilter = useApp((s) => s.envFilter);
+  const setEnvFilter = useApp((s) => s.setEnvFilter);
+  const actions = useActions();
+  const envs = useMemo(() => envsOf(notes, project), [notes, project]);
+  const keyCount = useMemo(() => notes.filter((n) => n.folder === project && isSecret(n)).length, [notes, project]);
+  const hasKeys = keyCount > 0;
+  const [sharing, setSharing] = useState(false);
+  const copyEnv = async () => {
+    const r = await projectEnvText(notes, project, envFilter);
+    if (r) await copySecret(r.text, ko.keys.copiedEnv(envForProject(notes, { project, env: r.env }).length));
+  };
+  const P = ko.projects;
+  return (
+    <>
+      {/* 연결은 이름 있는 프로젝트만 (.vault.yml의 project가 이름이다) */}
+      <div className="tabs" role="tablist" aria-label={P.tabs}>
+        <button type="button" role="tab" aria-selected={tab === 'keys'} onClick={() => setTab('keys')}>{P.tabKeys(keyCount)}</button>
+        {project !== null && (
+          <button type="button" role="tab" aria-selected={tab === 'connect'} onClick={() => setTab('connect')}>{P.tabConnect}</button>
+        )}
+      </div>
+      {tab === 'keys' && (
+        <>
+          <QuickAdd project={project} />
           <div className="env-bar">
             {envs.length > 0 && (
               <div className="segment" role="group" aria-label={ko.keys.env}>
@@ -406,11 +344,14 @@ function NoteList() {
               </div>
             )}
             {envs.length > 0 && (
-              <button type="button" className="btn btn-sm" aria-pressed={compare} onClick={() => setCompare(!compare)}>{ko.keys.compare}</button>
+              <div className="segment" role="group" aria-label={P.viewLabel}>
+                <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{P.viewList}</button>
+                <button type="button" aria-pressed={view === 'compare'} onClick={() => setView('compare')}>{P.viewCompare}</button>
+              </div>
             )}
             <span className="env-bar-gap" />
-            <button type="button" className="btn-link" onClick={() => setEnvImport({ text: '' })}>{ko.keys.importOpen}</button>
-            {projectHasKeys && (
+            <button type="button" className="btn-link" onClick={() => actions.importEnv()}>{ko.keys.importOpen}</button>
+            {hasKeys && (
               <ExportMenu
                 onCopy={() => void copyEnv()}
                 onSealed={() => void downloadSealedEnv(notes, project, envFilter)}
@@ -419,72 +360,19 @@ function NoteList() {
               />
             )}
           </div>
-        )}
-        {!noList && <div className="list-head">
-          <div className="segment" role="group" aria-label={ko.main.viewLabel}>
-            {(['list', 'cards', 'calendar'] as const).map((v) => (
-              <button key={v} type="button" aria-pressed={view === v} onClick={() => setPref('view', v)}>{ko.main.views[v]}</button>
-            ))}
-          </div>
-          {view !== 'calendar' && filter.kind !== 'dated' && (
-            <label className="sort-select">
-              <span className="sr-only">{ko.main.sortLabel}</span>
-              <select value={sort} onChange={(e) => setPref('sort', e.target.value as typeof sort)}>
-                {(['updated', 'created', 'title'] as const).map((k) => (
-                  <option key={k} value={k}>{ko.main.sort[k]}</option>
-                ))}
-              </select>
-            </label>
-          )}
-          <span className="list-count">{ko.main.count(list.length)}</span>
-        </div>}
-      </div>
-      <div className="list-scroll">
-        {inTrash && list.length > 0 && <p className="small muted" style={{ padding: '10px 16px 0' }}>{ko.main.trashHint}</p>}
-        {isIncident ? (
-          <IncidentView />
-        ) : compare ? (
-          <CompareTable project={project} />
-        ) : isToday && notes.length > 0 ? (
-          <TodayView now={now} onDaily={() => void actions.today()} />
-        ) : view === 'calendar' && !inTrash && !isToday ? (
-          <CalendarView list={list} now={now} />
-        ) : list.length === 0 ? (
-          <div className="empty">
-            <span>{notes.length === 0 && home ? ko.main.emptyList : ko.main.emptyFilter}</span>
-            {notes.length === 0 && home ? (
-              <button type="button" className="btn btn-sm" onClick={() => void actions.newNote()}>{ko.main.firstNote}</button>
-            ) : (
-              (filter.kind !== 'all' || query) && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => {
-                    setFilter({ kind: 'all' });
-                    setQuery('');
-                  }}
-                >
-                  {ko.main.resetFilter}
-                </button>
-              )
-            )}
-          </div>
-        ) : view === 'cards' ? (
-          <CardGrid list={list} />
-        ) : (
-          list.map((n) => <NoteRow key={n.id} n={n} now={now} />)
-        )}
-      </div>
+        </>
+      )}
       {sharing && <ShareDialog project={project} env={envFilter} onClose={() => setSharing(false)} />}
-      <div className="fab-bar">
-        <button type="button" className="btn btn-primary fab" onClick={() => void (keyScreen ? actions.newKey() : actions.newNote())}>+ {keyScreen ? ko.main.newKey : ko.main.newNote}</button>
-      </div>
-    </section>
+    </>
   );
 }
 
-export function useBacklinks(id: string | null): Note[] {
+function ProjectBody({ project }: { project: string | null }) {
+  const tab = useApp((s) => s.projectTab);
+  const view = useApp((s) => s.projectView);
   const notes = useApp((s) => s.notes);
-  const idx = useMemo(() => backlinkIndex(notes), [notes]);
-  return id ? (idx.get(id) ?? []) : [];
+  const hasEnvs = useMemo(() => envsOf(notes, project).length > 0, [notes, project]);
+  if (tab === 'connect' && project !== null) return <ConnectView project={project} />;
+  if (view === 'compare' && hasEnvs) return <CompareTable project={project} />;
+  return <ProjectKeyList project={project} />;
 }

@@ -1,7 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test';
 
-// 테스트 전용 값. 실제 비밀번호가 아니다.
-const PASSWORD = 'e2e 보라색 자전거 달력 소나무';
+import { PASSWORD, newProject } from './helpers';
 
 /**
  * 가짜 Google Drive. 앱의 DriveBackend가 보내는 요청(files.list / get / create / multipart 업로드)에 답한다.
@@ -82,7 +81,9 @@ async function unlock(page: Page) {
   await expect(page.getByRole('heading', { name: '잠금 해제' })).toBeVisible();
   await page.locator('#pw').fill(PASSWORD);
   await page.getByRole('button', { name: '열기', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '살펴볼 것' })).toBeVisible(); // 첫 화면
+  // 새 기기는 잠금을 푼 뒤에 Drive에서 받아 오므로, 프로젝트가 나타나면 연다
+  await page.locator('.sidebar').getByRole('button', { name: /^shop/ }).click();
+  await expect(page.getByRole('heading', { name: 'shop', exact: true })).toBeVisible();
 }
 const synced = (page: Page) => expect(page.locator('.sidebar .badge')).toContainText('동기화됨');
 
@@ -98,8 +99,9 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   await a.locator('#pw2').fill(PASSWORD);
   await a.getByRole('button', { name: '열쇠 만들기' }).click();
   await a.getByRole('button', { name: '적어두었습니다' }).click();
-  await a.getByLabel('빠른 메모').fill('첫 기기에서 쓴 메모');
-  await a.getByLabel('빠른 메모').press('Enter');
+  await newProject(a, 'shop');
+  await a.getByLabel('빠른 추가').fill('FIRST_DEVICE_KEY=first-device-value');
+  await a.getByLabel('빠른 추가').press('Enter');
   await a.locator('.sidebar').getByRole('button', { name: '설정' }).click();
   await a.getByRole('button', { name: 'Google Drive 연결' }).click(); // 연결 후 앱이 다시 로드된다
   await unlock(a);
@@ -110,7 +112,8 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   expect(names).toContain('vault.json');
   expect(names.filter((n) => n.endsWith('.enc'))).toHaveLength(1);
   const everything = [...drive.files.values()].map((f) => f.name + f.content).join('\n');
-  expect(everything).not.toContain('첫 기기에서 쓴 메모');
+  expect(everything).not.toContain('FIRST_DEVICE_KEY');
+  expect(everything).not.toContain('first-device-value');
   expect(everything).not.toContain(PASSWORD);
 
   // ---- 기기 B: 빈 브라우저. 새로 만들지 않고 Drive에서 불러온다 ----
@@ -120,14 +123,14 @@ test('두 기기: 로컬에서 시작 → Drive 연결 → 새 기기에서 같�
   await b.goto('/');
   await b.getByRole('button', { name: /Google Drive에서 불러오기/ }).click();
   await unlock(b); // 같은 비밀번호 → Drive의 감싼 열쇠가 풀린다
-  await expect(b.locator('.note-row', { hasText: '첫 기기에서 쓴 메모' })).toBeVisible();
+  await expect(b.locator('.key-row', { hasText: 'FIRST_DEVICE_KEY' })).toBeVisible();
 
   // ---- B에서 쓴 메모가 A에 나타난다 ----
-  await b.getByLabel('빠른 메모').fill('둘째 기기에서 쓴 메모');
-  await b.getByLabel('빠른 메모').press('Enter');
+  await b.getByLabel('빠른 추가').fill('SECOND_DEVICE_KEY=second-device-value');
+  await b.getByLabel('빠른 추가').press('Enter');
   await expect.poll(() => [...drive.files.values()].filter((f) => f.name.endsWith('.enc')).length).toBe(2);
   await a.evaluate(() => window.dispatchEvent(new Event('focus'))); // 창으로 돌아오면 동기화한다
-  await expect(a.locator('.note-row', { hasText: '둘째 기기에서 쓴 메모' })).toBeVisible();
+  await expect(a.locator('.key-row', { hasText: 'SECOND_DEVICE_KEY' })).toBeVisible();
 
   // 틀린 비밀번호로는 새 기기에서 못 연다
   const ctxC = await browser.newContext({ locale: 'ko-KR' });

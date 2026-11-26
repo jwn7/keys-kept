@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { extractTags, isSecret, type Note } from '@vault/core';
 import { SecretPanel } from './KeyViews';
 import { registerEditorFlush, useApp } from '../app/store';
@@ -7,10 +7,10 @@ import { ko } from '../i18n/ko';
 import { charCount, displayTitle, formatDay, relTime } from '../app/util';
 import { createMarkdownEditor, type EditorHandle } from '../editor/markdownEditor';
 import { LockIcon } from '../components/Icons';
-import { useBacklinks, useNoteActions } from './MainScreen';
+import { isWide, useActions } from './MainScreen';
+import { projectLabel } from './ProjectViews';
 import { VersionHistory } from './VersionHistory';
 import { ServerView } from './ServerView';
-import { relatedNotes } from '../app/assist';
 
 /** 입력 후 1초 디바운스 → 로컬 암호화 저장 → outbox (SPEC §2.1) */
 const DEBOUNCE_MS = 1000;
@@ -25,14 +25,11 @@ export function Editor() {
   const trash = useApp((s) => s.trash);
   const status = useApp((s) => s.status);
   const mobileView = useApp((s) => s.mobileView);
-  const view = useApp((s) => s.view);
+  const wide = useApp(isWide);
   const select = useApp((s) => s.select);
-  const actions = useNoteActions();
+  const actions = useActions();
   const note = notes.find((n) => n.id === selectedId) ?? trash.find((n) => n.id === selectedId) ?? null;
   const inTrash = !!note && note.deletedAt !== null;
-  const backlinks = useBacklinks(selectedId);
-  // 태그나 제목이 겹치는 메모. 이미 링크로 이어진 것은 위에 나오므로 뺀다.
-  const related = useMemo(() => (note && !inTrash ? relatedNotes(note, notes).filter((r) => !backlinks.some((b) => b.id === r.id)) : []), [note, notes, backlinks, inTrash]);
 
   const [title, setTitle] = useState('');
   const [saveState, setSaveState] = useState<SaveState>('saved');
@@ -116,7 +113,12 @@ export function Editor() {
           schedule();
         },
         titles: () => useApp.getState().notes.map((n) => n.title).filter(Boolean),
-        onOpenLink: (t) => void flush().then(() => actions.openByTitle(t)),
+        // [[이름]]: 같은 이름의 항목이 있으면 연다 (새로 만들지는 않는다)
+        onOpenLink: (t) =>
+          void flush().then(() => {
+            const found = useApp.getState().notes.find((n) => n.title.trim() === t.trim());
+            if (found) select(found.id);
+          }),
         onEscape: () => editorRef.current?.view.contentDOM.blur(),
       });
     } else {
@@ -171,9 +173,9 @@ export function Editor() {
         <div className="editor-empty">
           <p>{ko.main.noSelection}</p>
           <div className="hint-list">
-            <button type="button" onClick={() => void actions.newNote()}><span>{ko.main.hintNew}</span><kbd>Alt N</kbd></button>
+            <button type="button" onClick={() => void actions.newKey()}><span>{ko.main.hintNew}</span><kbd>Alt N</kbd></button>
             <button type="button" onClick={() => useApp.getState().setPalette(true)}><span>{ko.main.hintSearch}</span><kbd>Ctrl K</kbd></button>
-            <button type="button" onClick={() => void actions.today()}><span>{ko.main.hintToday}</span><kbd>Ctrl D</kbd></button>
+            <button type="button" onClick={() => actions.importEnv()}><span>{ko.main.hintImport}</span></button>
           </div>
         </div>
       </main>
@@ -181,7 +183,7 @@ export function Editor() {
   }
 
   const pending = status.state === 'offline' || status.state === 'auth' ? status.pending : 0;
-  const crumb = `${note.folder ?? ko.main.noFolder} / ${displayTitle(note)}`;
+  const crumb = [projectLabel(note.folder), note.secret?.env, note.secret ? null : displayTitle(note)].filter(Boolean).join(' / ');
   const saveText =
     saveState === 'saving' ? ko.editor.saving : saveState === 'error' ? ko.editor.saveFailed : saveState === 'dirty' ? ko.editor.unsaved : ko.editor.savedLocal(relTime(savedAt));
 
@@ -196,8 +198,8 @@ export function Editor() {
       >
         <div className="editor-meta">
           <span className="crumb desktop-only">{crumb}</span>
-          {view !== 'list' && (
-            <button type="button" className="icon-round desktop-only" aria-label={ko.main.closeNote} title={ko.main.closeNote} onClick={() => void flush().then(() => select(null))}>
+          {wide && (
+            <button type="button" className="icon-round desktop-only" aria-label={ko.main.closeItem} title={ko.main.closeItem} onClick={() => void flush().then(() => select(null))}>
               ×
             </button>
           )}
@@ -225,20 +227,28 @@ export function Editor() {
           }}
         />
         <div className="editor-tags">
-          {note.tags.map((t) => (
-            <button key={t} type="button" className="chip" onClick={() => useApp.getState().setFilter({ kind: 'tag', tag: t })}>#{t}</button>
-          ))}
           {!inTrash && (
             <>
-              <button type="button" className="chip chip-add" onClick={() => editorRef.current?.insert(' #', 2)}>{ko.editor.addTag}</button>
-              <DateField note={note} />
+              {isSecret(note) && <DateField note={note} />}
               <NoteMenu note={note} onFlush={flush} />
             </>
           )}
           {inTrash && (
             <>
               <span className="small muted">{ko.editor.readOnlyTrash}</span>
-              <button type="button" className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => void app.session.restore(note.id).then(() => useApp.getState().setFilter({ kind: 'all' }))}>{ko.main.restore}</button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() =>
+                  void app.session.restore(note.id).then(() => {
+                    useApp.getState().setFilter({ kind: 'project', project: note.folder });
+                    select(note.id);
+                  })
+                }
+              >
+                {ko.main.restore}
+              </button>
             </>
           )}
         </div>
@@ -247,31 +257,12 @@ export function Editor() {
         {!inTrash && (
           <div className="mobile-toolbar">
             <button type="button" onClick={() => editorRef.current?.insertAtLineStart('# ')} aria-label={ko.editor.toolbar.heading}>H</button>
-            <button type="button" onClick={() => editorRef.current?.insertAtLineStart('- [ ] ')} aria-label={ko.editor.toolbar.checkbox}>☐</button>
             <button type="button" onClick={() => editorRef.current?.insertAtLineStart('- ')} aria-label={ko.editor.toolbar.list}>•</button>
-            <button type="button" onClick={() => editorRef.current?.insert('[[', 2)}>{ko.editor.toolbar.link}</button>
-            <button type="button" onClick={() => editorRef.current?.insert('#', 1)}>{ko.editor.toolbar.tag}</button>
             <button type="button" onClick={() => editorRef.current?.insert('```\n\n```', 4)} aria-label={ko.editor.toolbar.code}>{'</>'}</button>
             <button type="button" onClick={() => editorRef.current?.openSlash()}>/</button>
           </div>
         )}
         <div className="editor-foot">
-          {backlinks.length > 0 && (
-            <div className="backlinks">
-              <span className="muted">{ko.editor.backlinks(backlinks.length)}</span>
-              {backlinks.map((b) => (
-                <button key={b.id} type="button" onClick={() => void flush().then(() => select(b.id))}>{displayTitle(b)}</button>
-              ))}
-            </div>
-          )}
-          {related.length > 0 && (
-            <div className="backlinks">
-              <span className="muted">{ko.editor.related}</span>
-              {related.map((r) => (
-                <button key={r.id} type="button" onClick={() => void flush().then(() => select(r.id))}>{displayTitle(r)}</button>
-              ))}
-            </div>
-          )}
           <div className="save-state">
             <span className={saveState === 'error' ? 'save-error' : undefined} role="status">
               {(saveState === 'saved' || saveState === 'saving') && <span className="tick" aria-hidden="true">✓ </span>}
@@ -288,7 +279,7 @@ export function Editor() {
   );
 }
 
-/** 일정 날짜: 누르면 날짜 고르기가 열린다. 고른 뒤 × 로 지운다 */
+/** 키의 만료일: 누르면 날짜 고르기가 열린다. 고른 뒤 × 로 지운다 */
 function DateField({ note }: { note: Note }) {
   const app = useApp((s) => s.app);
   const ref = useRef<HTMLInputElement>(null);
@@ -301,10 +292,10 @@ function DateField({ note }: { note: Note }) {
   return (
     <span className="date-field">
       <button type="button" className={`chip${note.date ? ' chip-date' : ' chip-add'}`} onClick={open}>
-        {note.date ? `${note.secret ? `${ko.keys.expiry} ` : ''}${formatDay(note.date)}` : `+ ${note.secret ? ko.keys.expiry : ko.cal.setDate}`}
+        {note.date ? `${ko.keys.expiry} ${formatDay(note.date)}` : `+ ${ko.keys.expiry}`}
       </button>
       {note.date && (
-        <button type="button" className="chip-x" aria-label={ko.cal.clearDate} onClick={() => set(null)}>×</button>
+        <button type="button" className="chip-x" aria-label={ko.keys.clearExpiry} onClick={() => set(null)}>×</button>
       )}
       <input ref={ref} type="date" className="date-input" tabIndex={-1} aria-hidden="true" value={note.date ?? ''} onChange={(e) => set(e.target.value || null)} />
     </span>
@@ -379,7 +370,6 @@ function NoteMenu({ note, onFlush }: { note: Note; onFlush: () => Promise<void> 
       <button type="button" className="btn btn-ghost btn-sm" aria-label={ko.editor.more} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>⋯</button>
       {open && (
         <div role="menu" className="menu">
-          <button type="button" role="menuitem" onClick={() => void act(() => app.session.save({ id: note.id, pinned: !note.pinned }))}>{note.pinned ? ko.editor.unpin : ko.editor.pin}</button>
           <button type="button" role="menuitem" onClick={() => void act(moveFolder)}>{ko.editor.moveFolder}</button>
           {!note.secret && (
             <button type="button" role="menuitem" onClick={() => void act(() => app.session.save({ id: note.id, secret: { value: '', env: null, usedIn: [] } }))}>{ko.keys.toKey}</button>

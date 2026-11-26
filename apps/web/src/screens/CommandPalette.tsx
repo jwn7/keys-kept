@@ -5,7 +5,8 @@ import { useApp } from '../app/store';
 import { ko } from '../i18n/ko';
 import { displayTitle, matchSnippet, relTime, searchNotes, shareOrDownload } from '../app/util';
 import { ui } from '../app/ui';
-import { useNoteActions } from './MainScreen';
+import { useActions } from './MainScreen';
+import { projectLabel } from './ProjectViews';
 
 /** run = Enter, alt = Shift+Enter, open = Ctrl+Enter (없으면 run) */
 type Item = { id: string; kind: 'note' | 'cmd'; label: string; meta?: string; key?: string; run: () => void | Promise<void>; alt?: () => void | Promise<void>; open?: () => void | Promise<void> };
@@ -16,11 +17,18 @@ export function CommandPalette() {
   const select = useApp((s) => s.select);
   const setPalette = useApp((s) => s.setPalette);
   const setScreen = useApp((s) => s.setScreen);
-  const actions = useNoteActions();
+  const actions = useActions();
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const close = () => setPalette(false);
+  /** 항목을 그 프로젝트의 키 탭에서 연다 (목록에서 어디에 있는지 보이게) */
+  const openItem = (id: string, project: string | null) => {
+    const st = useApp.getState();
+    if (st.filter.kind !== 'project' || st.filter.project !== project) st.setFilter({ kind: 'project', project });
+    st.setProjectTab('keys');
+    select(id);
+  };
 
   const items = useMemo<Item[]>(() => {
     const needle = q.trim().toLowerCase();
@@ -36,22 +44,20 @@ export function CommandPalette() {
               meta: [n.folder, n.secret.env, maskValue(n.secret.value)].filter(Boolean).join(' · '),
               run: () => copySecret(n.secret.value),
               alt: () => copySecret(formatEnv([{ name: n.title, value: n.secret.value }]).trimEnd(), ko.keys.copiedPair),
-              open: () => select(n.id),
+              open: () => openItem(n.id, n.folder),
             }
           : {
         id: n.id,
         kind: 'note',
         label: displayTitle(n),
         // 제목이 아니라 본문에서 찾았으면 그 대목을 보여준다
-        meta: (needle && !n.title.toLowerCase().includes(needle) && matchSnippet(n.body, needle)) || `${n.folder ?? ko.main.noFolder}, ${relTime(n.updatedAt)}`,
-        run: () => select(n.id),
+        meta: (needle && !n.title.toLowerCase().includes(needle) && matchSnippet(n.body, needle)) || `${projectLabel(n.folder)}, ${relTime(n.updatedAt)}`,
+        run: () => openItem(n.id, n.folder),
       });
     const all: Item[] = [
-      { id: 'new', kind: 'cmd', label: ko.palette.cmd.newNote, key: 'Alt N', run: () => void actions.newNote() },
-      { id: 'today', kind: 'cmd', label: ko.palette.cmd.today, key: 'Ctrl D', run: () => void actions.today() },
-      { id: 'plan', kind: 'cmd', label: ko.palette.cmd.plan, run: () => void actions.template('plan') },
-      { id: 'meeting', kind: 'cmd', label: ko.palette.cmd.meeting, run: () => void actions.template('meeting') },
-      { id: 'study', kind: 'cmd', label: ko.palette.cmd.study, run: () => void actions.template('study') },
+      { id: 'new', kind: 'cmd', label: ko.palette.cmd.newKey, key: 'Alt N', run: () => void actions.newKey() },
+      { id: 'import', kind: 'cmd', label: ko.palette.cmd.importEnv, run: () => actions.importEnv() },
+      { id: 'projects', kind: 'cmd', label: ko.palette.cmd.projects, run: () => useApp.getState().setFilter({ kind: 'projects' }) },
       { id: 'sync', kind: 'cmd', label: ko.palette.cmd.sync, run: () => void actions.syncNow() },
       {
         id: 'backup',
@@ -118,7 +124,7 @@ export function CommandPalette() {
           {q && <button type="button" className="clear" aria-label={ko.common.clear} onClick={() => setQ('')}>×</button>}
         </div>
         <div className="palette-list" role="listbox">
-          {noteCount > 0 && <div className="label">{ko.palette.notes(noteCount)}</div>}
+          {noteCount > 0 && <div className="label">{ko.palette.items(noteCount)}</div>}
           {items.map((it, i) => (
             <Fragment key={it.id}>
               {it.kind === 'cmd' && (i === 0 || items[i - 1]?.kind === 'note') && <div className="label" style={{ paddingTop: 10 }}>{ko.palette.commands}</div>}

@@ -1,10 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { strongEnough } from '../app/strength';
 import { compromisedBy, detectKey, envAgeFileName, envMatrix, formatEnv, generateSecret, isShareIdentity, isShareRecipient, newShareIdentity, openEnvWith, recipientFingerprint, recipientOf, sealEnvFor, envForProject, sealEnv, isSecret, maskValue, parseEnv, placesUsed, planEnvImport, publicNameWarning, secretIssues, type KeyDetection, type Note, type SecretInfo, type SecretIssue } from '@vault/core';
 import { registerEditorFlush, useApp } from '../app/store';
 import { ui } from '../app/ui';
 import { ko } from '../i18n/ko';
 import { dayKey, downloadBytes, formatDay, pickFile } from '../app/util';
 import { CopyIcon } from '../components/Icons';
+import { envsOf } from '../app/projectConfig';
 
 const K = ko.keys;
 
@@ -34,13 +36,6 @@ export async function copySecret(text: string, message: string = K.copied): Prom
   }, CLEAR_AFTER_MS);
 }
 
-/** 프로젝트에 있는 환경 이름들 (dev, prod …). */
-export function envsOf(notes: Note[], project: string | null): string[] {
-  const s = new Set<string>();
-  for (const n of notes) if (isSecret(n) && n.folder === project && n.secret.env) s.add(n.secret.env);
-  return [...s].sort();
-}
-
 /** 프로젝트 하나를 .env 글로. 환경이 여럿인데 고르지 않았으면 물어본다. null을 돌려주면 취소. */
 export async function projectEnvText(notes: Note[], project: string | null, env: string | null): Promise<{ text: string; env: string | null } | null> {
   const envs = envsOf(notes, project);
@@ -66,7 +61,7 @@ function IssueChip({ issue, date, today }: { issue: SecretIssue; date?: string |
 }
 
 /** 목록의 한 줄: 이름, 어느 서비스의 키인지, 가린 값, 살펴볼 것, 복사 단추. */
-export function KeyRow({ n }: { n: Note & { secret: SecretInfo } }) {
+export function KeyRow({ n, showProject }: { n: Note & { secret: SecretInfo }; showProject?: boolean | undefined }) {
   const selectedId = useApp((s) => s.selectedId);
   const select = useApp((s) => s.select);
   const today = dayKey(new Date());
@@ -80,6 +75,7 @@ export function KeyRow({ n }: { n: Note & { secret: SecretInfo } }) {
           {n.secret.env && <span className="key-chip line">{n.secret.env}</span>}
         </span>
         <span className="key-sub">
+          {showProject && <span className="key-project">{n.folder ?? ko.projects.noProject}</span>}
           <span>{d ? d.provider : K.unknownKind}</span>
           <span className="key-mask">{maskValue(n.secret.value) || K.noValue}</span>
           {d?.exposure === 'public' && <span className="key-chip ok">{K.publicOk}</span>}
@@ -252,12 +248,12 @@ export function SecretPanel({ note }: { note: Note & { secret: SecretInfo } }) {
 // ---------- .env 넣기 ----------
 
 /** 붙여 넣은 .env를 항목으로 나눠 보여주고, 확인하면 장부에 넣는다. 같은 이름은 값만 고친다. */
-export function EnvImportDialog({ initialText, project: initialProject, onClose }: { initialText: string; project: string | null; onClose: () => void }) {
+export function EnvImportDialog({ initialText, project: initialProject, env: initialEnv, onClose }: { initialText: string; project: string | null; env?: string | null | undefined; onClose: () => void }) {
   const app = useApp((s) => s.app);
   const notes = useApp((s) => s.notes);
   const [text, setText] = useState(initialText);
   const [project, setProject] = useState(initialProject ?? '');
-  const [env, setEnv] = useState('');
+  const [env, setEnv] = useState(initialEnv ?? '');
   const [busy, setBusy] = useState(false);
   const scope = { project: project.trim() || null, env: env.trim() || null };
   const entries = useMemo(() => parseEnv(text), [text]);
@@ -278,7 +274,7 @@ export function EnvImportDialog({ initialText, project: initialProject, onClose 
       for (const input of [...plan.create, ...plan.update]) await app.session.save(input);
       if (app.backendKind !== 'memory') app.scheduler.requestNow();
       ui.toast(K.imported(plan.create.length, plan.update.length));
-      if (scope.project) useApp.getState().setFilter({ kind: 'folder', folder: scope.project });
+      useApp.getState().setFilter({ kind: 'project', project: scope.project });
       onClose();
     } finally {
       setBusy(false);
@@ -346,6 +342,7 @@ export async function downloadSealedEnv(notes: Note[], project: string | null, e
     chosen = answer.trim() || null;
   }
   const pass = await ui.prompt({ title: K.sealedTitle, body: K.sealedBody, label: K.sealedPass, password: true, confirmLabel: K.download });
+  if (pass && !(await strongEnough(pass))) return ui.toast(K.weakFilePass); // 파일이 새면 남는 방어는 이 비밀번호뿐
   if (!pass) return;
   const name = envAgeFileName(chosen);
   downloadBytes(name, await sealEnv(envForProject(notes, { project, env: chosen }), pass));
@@ -470,7 +467,10 @@ export function CompareTable({ project }: { project: string | null }) {
   if (m.envs.length === 0) return <p className="agenda-empty">{K.compareNoEnv}</p>;
   return (
     <div className="compare">
-      <p className={`compare-summary${m.missing.length ? ' warn' : ''}`}>{K.compareMissingCount(m.missing.length)}</p>
+      <p className="compare-summary">
+        <span>{ko.projects.keys(m.rows.length)}</span>
+        <span className={m.missing.length ? 'warn' : undefined}>{K.compareMissingCount(m.missing.length)}</span>
+      </p>
       <div className="compare-scroll">
         <table className="compare-table">
           <thead>
@@ -515,6 +515,7 @@ export function CompareTable({ project }: { project: string | null }) {
           </tbody>
         </table>
       </div>
+      <p className="small muted compare-hint">{K.compareHint}</p>
     </div>
   );
 }
