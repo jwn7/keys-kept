@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "keys-kept": {
+      "command": "npx",
+      "args": ["-y", "keys-kept@0.1", "mcp"],
+      "env": {
+        "VAULT_ENV_PASSPHRASE": "${VAULT_ENV_PASSPHRASE:-}",
+        "VAULT_ENV_IDENTITY_FILE": "${VAULT_ENV_IDENTITY_FILE:-}",
+        "VAULT_PROJECT_DIR": "${CLAUDE_PROJECT_DIR:-}"
+      }
+    }
+  }
+}

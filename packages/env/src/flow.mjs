@@ -6,7 +6,64 @@ import { join } from 'node:path';
 import { parseEnv } from './index.mjs';
 
 /**
- * `.vault.json`의 `branches`로 지금 브랜치의 환경을 고른다.
+ * 프로젝트 폴더의 `.vault.yml`을 읽는다. 의존성 없이 아래 모양만 알아듣는다(모르는 줄은 무시):
+ *   project: shop          이 폴더가 금고의 어느 프로젝트인가
+ *   ai: true               false면 AI 도구(MCP)가 이 폴더의 키를 쓰지 못한다
+ *   branches:              브랜치 → 환경 (무늬에 * 가능, 위에서부터가 아니라 "정확한 이름 → 긴 무늬" 순)
+ *     main: prod
+ *     "*": dev
+ *   required:              실행에 꼭 있어야 하는 이름 (vault-check가 본다)
+ *     - STRIPE_SECRET_KEY
+ */
+export function parseVaultYml(text) {
+  const cfg = { project: null, ai: true, branches: {}, required: [] };
+  const unq = (s) => s.trim().replace(/^(["'])(.*)\1$/, '$2');
+  let section = null;
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.replace(/^\s*#.*$/, '').replace(/\s+#.*$/, '');
+    if (!line.trim()) continue;
+    if (!/^\s/.test(line)) {
+      const m = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+      section = m && !m[2].trim() ? m[1] : null;
+      if (m?.[1] === 'project' && m[2].trim()) cfg.project = unq(m[2]);
+      if (m?.[1] === 'ai' && m[2].trim()) cfg.ai = !/^(false|no|off)$/i.test(unq(m[2]));
+      continue;
+    }
+    if (section === 'branches') {
+      const m = /^\s+("[^"]*"|'[^']*'|[^:]+):\s*(\S.*)$/.exec(line);
+      if (m) cfg.branches[unq(m[1])] = unq(m[2]);
+    } else if (section === 'required') {
+      const m = /^\s+-\s*(\S.*)$/.exec(line);
+      if (m) cfg.required.push(unq(m[1]));
+    }
+  }
+  return cfg;
+}
+
+/** 폴더의 설정: `.vault.yml`이 먼저, 없으면 예전 `.vault.json`. 둘 다 없거나 깨졌으면 null. */
+export function readVaultConfig(cwd = process.cwd()) {
+  const yml = join(cwd, '.vault.yml');
+  if (existsSync(yml)) {
+    try {
+      return { ...parseVaultYml(readFileSync(yml, 'utf8')), source: '.vault.yml' };
+    } catch {
+      return null;
+    }
+  }
+  const json = join(cwd, '.vault.json');
+  if (existsSync(json)) {
+    try {
+      const c = JSON.parse(readFileSync(json, 'utf8'));
+      return { project: c.project ?? null, ai: c.ai !== false, branches: c.branches ?? {}, required: Array.isArray(c.required) ? c.required : [], source: '.vault.json' };
+    } catch {
+      return null; // 잘못된 설정은 없는 것으로 본다
+    }
+  }
+  return null;
+}
+
+/**
+ * 설정의 `branches`로 지금 브랜치의 환경을 고른다.
  *   { "branches": { "main": "prod", "release/*": "prod", "*": "dev" } }
  * 정확히 같은 이름이 먼저, 그다음 `*`가 든 무늬 중 긴 것(더 구체적인 것)이 이긴다. 맞는 것이 없으면 null.
  */
@@ -37,14 +94,8 @@ export function currentBranch(cwd = process.cwd()) {
 export function resolveEnvFile({ file, cwd = process.cwd(), branch } = {}) {
   if (file) return { file, env: null };
   if (process.env.VAULT_ENV_FILE) return { file: process.env.VAULT_ENV_FILE, env: null };
-  const cfgPath = join(cwd, '.vault.json');
-  if (existsSync(cfgPath)) {
-    let cfg = null;
-    try {
-      cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
-    } catch {
-      /* 잘못된 설정은 없는 것으로 본다 */
-    }
+  const cfg = readVaultConfig(cwd);
+  if (cfg) {
     const env = pickEnvForBranch(cfg, branch ?? currentBranch(cwd));
     // 브라우저는 내려받을 때 이름 맨 앞의 점을 뗀다(`.env.prod.age` → `env.prod.age`). 둘 다 찾는다.
     for (const name of env ? [`.env.${env}.age`, `env.${env}.age`] : []) {

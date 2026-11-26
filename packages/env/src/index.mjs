@@ -151,7 +151,7 @@ export function promptHidden(question) {
 
 /** 비밀번호: VAULT_ENV_PASSPHRASE가 있으면 그것, 없으면 터미널에서 묻는다. */
 export async function getPassphrase(file) {
-  return process.env.VAULT_ENV_PASSPHRASE ?? promptHidden(`${file} 비밀번호: `);
+  return process.env.VAULT_ENV_PASSPHRASE || promptHidden(`${file} 비밀번호: `);
 }
 
 /** 풀어서 process.env에 넣는다. 이미 있는 이름은 덮어쓰지 않는다(배포 환경이 정한 값이 우선). 넣은 이름 목록을 돌려준다. */

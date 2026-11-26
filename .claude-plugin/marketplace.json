@@ -1,0 +1,12 @@
+{
+  "name": "vault-notes",
+  "description": "Keys Kept: use API keys from an encrypted local vault in Claude Code without pasting secrets.",
+  "owner": { "name": "jwn7" },
+  "plugins": [
+    {
+      "name": "keys-kept",
+      "source": "./plugins/keys-kept",
+      "description": "MCP tools (list_keys, run_with_keys, request_key) plus a skill so Claude uses keys by name and never asks you to paste a secret."
+    }
+  ]
+}

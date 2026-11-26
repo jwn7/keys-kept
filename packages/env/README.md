@@ -1,4 +1,40 @@
-# @vault/env: 평문 `.env` 없이 키 꺼내 쓰기
+# keys-kept
+
+Run commands with keys from an encrypted `.env.age`, without a plaintext `.env` on disk. Includes an MCP server so AI coding tools (Claude Code, Cursor) use your keys **by name** and never receive the values.
+
+The encrypted files come from the Keys Kept app ([jwn7/vault-notes](https://github.com/jwn7/vault-notes)), and they are standard [age](https://age-encryption.org) files, so `age -d .env.age` also works.
+
+```sh
+npx keys-kept run -- npm run dev          # decrypt into this command's environment only
+npx keys-kept check                       # every name in .vault.yml `required` / .env.example present?
+npx keys-kept scan                        # staged files contain a real key value? (pre-commit)
+npx keys-kept push github --repo me/app   # copy keys into GitHub Actions secrets via your gh login
+npx keys-kept mcp                         # MCP server (stdio): list_keys, run_with_keys, request_key
+```
+
+Claude Code: `/plugin marketplace add jwn7/vault-notes` then `/plugin install keys-kept@vault-notes`, or
+`claude mcp add --transport stdio --env VAULT_ENV_PASSPHRASE=<file password> keys-kept -- npx -y keys-kept mcp`.
+
+A `.vault.yml` in the project folder links it to a vault project and picks the file per git branch:
+
+```yaml
+project: shop
+ai: true            # false: the MCP tools refuse for this folder
+branches:
+  main: prod        # main uses .env.prod.age
+  "*": dev          # other branches use .env.dev.age
+required:
+  - STRIPE_SECRET_KEY
+```
+
+The MCP server logs which key **names** it used (never values) to `.vault/ai-log.jsonl`, which the app shows. Set `VAULT_AI_LOG=0` to turn that off.
+
+Not externally audited. Read the limits below before using it with production keys.
+
+---
+
+## 한국어
+
 
 Vault 앱에서 프로젝트를 **암호화해서 내려받기** 하면 `.env.age` 파일이 생긴다. 표준 age 파일이고 안에는 보통의 `.env` 글이 들어 있다. 이 패키지는 그 파일을 풀어 **실행하는 프로그램의 환경변수로만** 넣는다. 풀린 값은 디스크에 닿지 않는다.
 
@@ -6,14 +42,14 @@ Vault 앱에서 프로젝트를 **암호화해서 내려받기** 하면 `.env.ag
 
 ## 1. 감싸서 실행
 ```
-node packages/env/bin/vault-run.mjs -- npm run dev
-node packages/env/bin/vault-run.mjs --file .env.prod.age -- node server.js
+npx keys-kept run -- npm run dev
+npx keys-kept run --file .env.prod.age -- node server.js
 ```
 비밀번호를 한 번 묻는다(글자는 보이지 않는다). 물을 터미널이 없으면 `VAULT_ENV_PASSPHRASE` 환경변수에서 읽는다. 실행하는 프로그램에는 금고 비밀번호를 넘기지 않는다.
 
 ## 2. 코드에서 한 줄로
 ```js
-import '@vault/env/load'; // dotenv의 'dotenv/config' 자리
+import 'keys-kept/load'; // dotenv의 'dotenv/config' 자리
 ```
 `.env.age`가 있으면 풀어 `process.env`에 넣는다. 이미 있는 이름은 덮어쓰지 않는다. 파일이 없으면 조용히 넘어간다(배포 환경에서는 환경변수가 직접 들어온다).
 
@@ -24,9 +60,9 @@ AI가 "이 키를 넣어 주세요"라고 할 때 채팅에 붙여 넣지 않게
 {
   "mcpServers": {
     "vault": {
-      "command": "node",
-      "args": ["<저장소>/packages/env/bin/vault-mcp.mjs"],
-      "env": { "VAULT_ENV_FILE": "<프로젝트>/.env.age", "VAULT_ENV_PASSPHRASE": "<파일 비밀번호>" }
+      "command": "npx",
+      "args": ["-y", "keys-kept", "mcp"],
+      "env": { "VAULT_ENV_PASSPHRASE": "<파일 비밀번호>" }
     }
   }
 }
@@ -47,38 +83,35 @@ AI가 "이 키를 넣어 주세요"라고 할 때 채팅에 붙여 넣지 않게
 - 6자보다 짧은 값은 가리지 않는다(우연히 겹치는 글자가 많다).
 
 ## 4. 깃 브랜치에 따라 환경 고르기
-프로젝트 폴더에 `.vault.json`을 두면 `vault-run`이 지금 브랜치에 맞는 파일을 고른다.
-```json
-{ "branches": { "main": "prod", "release/*": "prod", "*": "dev" } }
-```
+프로젝트 폴더에 `.vault.yml`(위 예시)을 두면 `run`과 `mcp`가 지금 브랜치에 맞는 파일을 고른다. 예전 `.vault.json`(`{ "branches": {...} }`)도 계속 읽는다. `required`는 `check`가, `ai: false`는 `mcp`가 본다.
 `main`에서는 `.env.prod.age`, 그 밖의 브랜치에서는 `.env.dev.age`를 쓴다. 맞는 파일이 없으면 `.env.age`. `--file`을 주면 그것이 우선한다.
 
 ## 5. 실행 전에 빠진 변수 찾기
 ```
-node packages/env/bin/vault-check.mjs            # .env.example 의 이름이 금고에 다 있는지
+npx keys-kept check            # .env.example 의 이름이 금고에 다 있는지
 ```
 빠진 이름이 있으면 알리고 종료 코드 1로 끝난다.
 
 ## 6. 커밋 전에 유출 막기
 ```
-node packages/env/bin/vault-scan.mjs             # git에 올린 파일에 금고의 값이 들어 있는지
-node packages/env/bin/vault-scan.mjs src/a.ts    # 파일을 직접 줄 수도 있다
+npx keys-kept scan             # git에 올린 파일에 금고의 값이 들어 있는지
+npx keys-kept scan src/a.ts    # 파일을 직접 줄 수도 있다
 ```
 모양으로 추측하는 검사기와 달리 금고의 **실제 값**과 비교하므로, 어떤 서비스의 키든 잡는다. 값은 다시 찍지 않고 파일·줄·키 이름만 알린다. 8자 미만의 값은 보지 않는다.
 `.git/hooks/pre-commit`에서 부르면 커밋을 막는다(비밀번호는 `VAULT_ENV_PASSPHRASE`).
 
 ## 7. GitHub Actions 비밀값으로 올리기
 ```
-node packages/env/bin/vault-push.mjs github --dry-run                 # 무엇이 올라갈지만 본다
-node packages/env/bin/vault-push.mjs github --repo me/app             # 전부
-node packages/env/bin/vault-push.mjs github --only OPENAI_API_KEY --env production
+npx keys-kept push github --dry-run                 # 무엇이 올라갈지만 본다
+npx keys-kept push github --repo me/app             # 전부
+npx keys-kept push github --only OPENAI_API_KEY --env production
 ```
 우리 서버를 거치지 않는다. 이 기기에서 [GitHub CLI](https://cli.github.com/)(`gh`)의 로그인으로 바로 올리므로 `gh auth login`이 돼 있어야 한다. 값은 명령줄 인자가 아니라 표준 입력으로 넘긴다. GitHub는 올린 값을 다시 보여주지 않으므로, 원본은 계속 금고에 둔다.
 
 ## 8. 팀원이 보낸 파일 열기
 팀원이 내 공개키로 잠가 보낸 파일은 비밀번호 대신 내 개인키로 연다(`docs/TEAM.md`).
 ```
-VAULT_ENV_IDENTITY_FILE=내개인키.txt  node packages/env/bin/vault-run.mjs --file .env.age -- npm run dev
+VAULT_ENV_IDENTITY_FILE=내개인키.txt  npx keys-kept run --file .env.age -- npm run dev
 ```
 
 ## age만으로 풀기

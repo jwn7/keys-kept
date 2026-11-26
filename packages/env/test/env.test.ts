@@ -68,7 +68,7 @@ describe('vault-run: 풀어서 그 명령의 환경변수로만 넣는다', () =
 describe('vault-mcp: AI에게 이름만 주고 값은 주지 않는다', () => {
   /** 서버를 띄우고 요청을 차례로 보낸 뒤, id별 응답을 돌려준다. */
   async function session(requests: object[]): Promise<Record<number, { result?: { content?: { text: string }[]; isError?: boolean; tools?: { name: string }[] } }>> {
-    const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file } });
+    const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { cwd: dir, env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file } }); // 임시 폴더에서 띄운다: 사용 기록(.vault/)이 저장소에 생기지 않게
     const got: Record<number, never> = {};
     let buf = '';
     const done = new Promise<void>((resolve) => {
@@ -232,7 +232,7 @@ describe('검토에서 나온 결함', () => {
 describe('vault-mcp: 검토에서 나온 결함', () => {
   const talk = (lines: string[], expectIds: number[]) =>
     new Promise<Record<number, { result?: { content?: { text: string }[] } }>>((resolve, reject) => {
-      const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file } });
+      const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { cwd: dir, env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file } }); // 임시 폴더에서 띄운다: 사용 기록(.vault/)이 저장소에 생기지 않게
       const got: Record<number, never> = {};
       let buf = '';
       child.on('exit', (code) => code !== null && code !== 0 && reject(new Error(`server exited ${code}`)));
@@ -301,4 +301,94 @@ describe('vault-push github', () => {
 
     expect(run(['--only', 'NOPE']).status).toBe(2);
   });
+});
+
+// @ts-expect-error 순수 JS 모듈이라 타입 선언이 없다
+import { parseVaultYml, readVaultConfig } from '../src/flow.mjs';
+
+describe('.vault.yml: 폴더와 금고의 프로젝트를 잇는 설정', () => {
+  it('parseVaultYml: project, ai, branches(따옴표 무늬), required. 주석과 모르는 줄은 무시', () => {
+    const cfg = parseVaultYml('# 설명\nproject: shop\nai: false  # 끔\nbranches:\n  main: prod\n  "release/*": prod\n  "*": dev\nrequired:\n  - STRIPE_SECRET_KEY\n  - "DATABASE_URL"\nother: 1\n  - NOT_REQUIRED\n');
+    expect(cfg).toEqual({ project: 'shop', ai: false, branches: { main: 'prod', 'release/*': 'prod', '*': 'dev' }, required: ['STRIPE_SECRET_KEY', 'DATABASE_URL'] });
+    expect(parseVaultYml('project: a').ai).toBe(true); // 적지 않으면 켜짐
+    expect(parseVaultYml('').required).toEqual([]);
+  });
+
+  it('readVaultConfig: .vault.yml 이 .vault.json 보다 먼저. resolveEnvFile도 yml의 브랜치 규칙을 쓴다', () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-yml-'));
+    writeFileSync(join(d, '.vault.json'), JSON.stringify({ branches: { main: 'dev' } }));
+    writeFileSync(join(d, '.vault.yml'), 'project: shop\nbranches:\n  main: prod\n');
+    writeFileSync(join(d, '.env.prod.age'), 'x');
+    expect(readVaultConfig(d)).toMatchObject({ project: 'shop', source: '.vault.yml' });
+    expect(resolveEnvFile({ cwd: d, branch: 'main' })).toEqual({ file: join(d, '.env.prod.age'), env: 'prod' });
+  });
+
+  it('vault-check: .env.example 이 없어도 required 의 빠진 이름을 찾는다', () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-req-'));
+    writeFileSync(join(d, '.vault.yml'), 'required:\n  - OPENAI_API_KEY\n  - NEW_ONE\n');
+    const r = spawnSync(process.execPath, [bin('vault-check.mjs'), '--file', file], { cwd: d, env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS }, encoding: 'utf8' });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('NEW_ONE');
+    expect(r.stderr).not.toContain('OPENAI_API_KEY');
+  });
+});
+
+describe('keys-kept: npx 한 줄로 쓰는 단일 명령', () => {
+  it('keys-kept run 은 vault-run 과 같다. 모르는 명령이면 2', () => {
+    const r = spawnSync(process.execPath, [bin('keys-kept.mjs'), 'run', '--file', file, '--', process.execPath, '-e', 'console.log(process.env.DATABASE_URL)'], { env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS }, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('postgres://u:p@host/db');
+    expect(spawnSync(process.execPath, [bin('keys-kept.mjs'), 'nope'], { encoding: 'utf8' }).status).toBe(2);
+  });
+
+  it('비밀번호 환경변수가 빈 문자열이면 없는 것으로 본다 (플러그인이 ${VAR:-}로 넘기는 경우)', () => {
+    const r = spawnSync(process.execPath, [bin('vault-run.mjs'), '--file', file, '--', process.execPath, '-e', '1'], { env: { ...process.env, VAULT_ENV_PASSPHRASE: '' }, encoding: 'utf8', input: '' });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('VAULT_ENV_PASSPHRASE'); // 빈 비밀번호로 풀려고 하지 않고, 물을 터미널이 없다고 알린다
+  });
+});
+
+describe('vault-mcp: 폴더 설정을 따르고 쓴 기록을 남긴다', () => {
+  const ask = (cwd: string, reqs: object[]) =>
+    new Promise<Record<number, { result?: { content?: { text: string }[]; isError?: boolean } }>>((resolve) => {
+      const child = spawn(process.execPath, [bin('vault-mcp.mjs')], { cwd, env: { ...process.env, VAULT_ENV_PASSPHRASE: PASS, VAULT_ENV_FILE: file, VAULT_PROJECT_DIR: '' } });
+      const got: Record<number, never> = {};
+      let buf = '';
+      child.stdout.on('data', (b: Buffer) => {
+        buf += b.toString();
+        for (const line of buf.split('\n').slice(0, -1)) got[(JSON.parse(line) as { id: number }).id] = JSON.parse(line) as never;
+        buf = buf.slice(buf.lastIndexOf('\n') + 1);
+        if (Object.keys(got).length === reqs.length) {
+          child.kill();
+          resolve(got);
+        }
+      });
+      for (const r of reqs) child.stdin.write(`${JSON.stringify(r)}\n`);
+    });
+  const call = (id: number, name: string, args: object = {}) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
+
+  it('.vault.yml 에 ai: false 면 모든 도구가 거절하고, 아무것도 풀지 않는다', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-aioff-'));
+    writeFileSync(join(d, '.vault.yml'), 'project: shop\nai: false\n');
+    const r = await ask(d, [call(1, 'list_keys'), call(2, 'run_with_keys', { command: process.execPath, args: ['-e', '1'], keys: ['OPENAI_API_KEY'] })]);
+    expect(r[1]!.result!.isError).toBe(true);
+    expect(r[1]!.result!.content![0]!.text).toContain('ai: false');
+    expect(r[2]!.result!.isError).toBe(true);
+    expect(JSON.stringify(r)).not.toContain('OPENAI_API_KEY\nDATABASE_URL');
+  });
+
+  it('사용 기록: .vault/ai-log.jsonl 에 이름·명령·가린 횟수만 남고 값은 없다. .vault/.gitignore 도 만든다', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'vault-log-'));
+    await ask(d, [call(1, 'list_keys'), call(2, 'run_with_keys', { command: process.execPath, args: ['-e', 'console.log(process.env.OPENAI_API_KEY)'], keys: ['OPENAI_API_KEY'] }), call(3, 'request_key', { name: 'RESEND_API_KEY' })]);
+    const log = readFileSync(join(d, '.vault', 'ai-log.jsonl'), 'utf8');
+    expect(log).not.toContain(SECRET);
+    const rows = log.trim().split('\n').map((l) => JSON.parse(l) as { tool: string; keys?: string[]; redacted?: number; at: string });
+    // 서버는 요청을 동시에 처리한다: 기록 순서는 끝난 순서라 이름으로 찾는다
+    const by = (t: string) => rows.find((x) => x.tool === t);
+    expect(rows.map((x) => x.tool).sort()).toEqual(['list_keys', 'request_key', 'run_with_keys']);
+    expect(by('run_with_keys')).toMatchObject({ keys: ['OPENAI_API_KEY'], redacted: 1 });
+    expect(by('request_key')).toMatchObject({ keys: ['RESEND_API_KEY'] });
+    expect(Number.isNaN(Date.parse(rows[0]!.at))).toBe(false);
+    expect(readFileSync(join(d, '.vault', '.gitignore'), 'utf8').trim()).toBe('*');
+  }, 30_000);
 });

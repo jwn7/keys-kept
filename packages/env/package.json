@@ -1,15 +1,45 @@
 {
-  "name": "@vault/env",
-  "version": "0.0.1",
-  "private": true,
+  "name": "keys-kept",
+  "version": "0.1.0",
+  "description": "Run commands with keys from an encrypted .env.age, without a plaintext .env. Includes an MCP server so AI coding tools use keys by name, never by value.",
+  "keywords": [
+    "env",
+    "dotenv",
+    "secrets",
+    "age",
+    "mcp",
+    "claude",
+    "api-keys",
+    "encryption"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jwn7/vault-notes.git",
+    "directory": "packages/env"
+  },
+  "homepage": "https://github.com/jwn7/vault-notes/tree/main/packages/env#readme",
+  "bugs": {
+    "url": "https://github.com/jwn7/vault-notes/issues"
+  },
   "type": "module",
-  "description": "암호화된 .env.age를 풀어 실행하는 프로그램의 환경변수로만 넣는다. 평문 .env를 디스크에 두지 않는다.",
+  "engines": {
+    "node": ">=20"
+  },
+  "mcpName": "io.github.jwn7/keys-kept",
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": "./src/index.mjs",
     "./load": "./src/load.mjs",
     "./flow": "./src/flow.mjs"
   },
   "bin": {
+    "keys-kept": "./bin/keys-kept.mjs",
     "vault-run": "./bin/vault-run.mjs",
     "vault-mcp": "./bin/vault-mcp.mjs",
     "vault-scan": "./bin/vault-scan.mjs",
@@ -24,5 +54,8 @@
   },
   "devDependencies": {
     "@vault/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

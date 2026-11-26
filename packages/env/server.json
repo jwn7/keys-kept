@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jwn7/keys-kept",
+  "description": "Use API keys from an encrypted .env.age by name. AI tools never receive the values.",
+  "repository": { "url": "https://github.com/jwn7/vault-notes", "source": "github", "subfolder": "packages/env" },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "keys-kept",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        { "name": "VAULT_ENV_PASSPHRASE", "description": "Password of the .env.age key file (not the vault master password)", "isSecret": true, "isRequired": false },
+        { "name": "VAULT_ENV_IDENTITY_FILE", "description": "Path to your age identity file, for files sealed to your public key", "isRequired": false }
+      ]
+    }
+  ]
+}
