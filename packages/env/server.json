@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.jwn7/keys-kept",
   "description": "Use API keys from an encrypted .env.age by name. AI tools never receive the values.",
-  "repository": { "url": "https://github.com/jwn7/keys-kept", "source": "github", "subfolder": "packages/env" },
+  "repository": { "url": "https://github.com/keys-kept/keys-kept", "source": "github", "subfolder": "packages/env" },
   "version": "0.1.1",
   "packages": [
     {

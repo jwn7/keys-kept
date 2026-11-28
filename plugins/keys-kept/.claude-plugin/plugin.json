@@ -3,8 +3,8 @@
   "version": "0.1.1",
   "description": "Use keys from an encrypted .env.age by name. Claude never sees or asks for the values.",
   "author": { "name": "jwn7" },
-  "homepage": "https://github.com/jwn7/keys-kept/tree/main/plugins/keys-kept",
-  "repository": "https://github.com/jwn7/keys-kept",
+  "homepage": "https://github.com/keys-kept/keys-kept/tree/main/plugins/keys-kept",
+  "repository": "https://github.com/keys-kept/keys-kept",
   "license": "MIT",
   "keywords": ["secrets", "env", "api-keys", "mcp", "age"]
 }

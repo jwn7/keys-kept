@@ -6,7 +6,7 @@
 
 ```sh
 # Claude Code: MCP 서버 + 스킬
-/plugin marketplace add jwn7/keys-kept
+/plugin marketplace add keys-kept/keys-kept
 /plugin install keys-kept@keys-kept
 
 # 아무 셸에서: 암호화된 .env.age로 실행, 평문 .env 없이
@@ -19,7 +19,7 @@ npx keys-kept run -- npm run dev
 - 키를 붙여 넣으면 어느 서비스의 무슨 키인지 알아보고, 브라우저에 공개되는 이름(`NEXT_PUBLIC_`, `VITE_`)에 비밀 키를 넣으면 경고한다.
 - 꺼내 쓰기: `Ctrl+K` → 이름 → Enter로 복사. `.env` 통째로 넣고 꺼내기.
 - 평문 `.env` 없이 실행: `npx keys-kept run -- npm run dev` (npm 패키지 `keys-kept`, 코드는 `packages/env`).
-- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버 `npx keys-kept mcp`. Claude Code는 `/plugin marketplace add jwn7/keys-kept` → `/plugin install keys-kept@keys-kept`).
+- AI 코딩 도구에는 키 이름만 주고 값은 주지 않는다 (MCP 서버 `npx keys-kept mcp`. Claude Code는 `/plugin marketplace add keys-kept/keys-kept` → `/plugin install keys-kept@keys-kept`).
 - 사고 모드: 털린 기기나 프로젝트를 고르면 바꿔야 할 키 체크리스트가 나온다.
 - 환경 비교표: 키를 행, 환경을 열로 놓고 한 환경에만 빠진 값을 찾는다.
 - 개발 흐름 연결(`packages/env`): 깃 브랜치 → 환경, `.env.example` 대조(`vault-check`), 커밋 전 유출 검사(`vault-scan`), GitHub Actions로 올리기(`vault-push`).

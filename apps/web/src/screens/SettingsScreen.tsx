@@ -565,7 +565,7 @@ function changeLang(next: Lang) {
   window.location.reload();
 }
 
-const SOURCE_URL = 'https://github.com/jwn7/keys-kept';
+const SOURCE_URL = 'https://github.com/keys-kept/keys-kept';
 
 function LookSection() {
   const theme = useApp((s) => s.theme);

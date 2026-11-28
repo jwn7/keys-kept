@@ -136,7 +136,7 @@ test('연결 탭: 코드 폴더에 암호화된 키 파일과 .vault.yml을 쓰�
   // MCP 명령: 진짜 비밀번호 대신 자리 표시. 복사도 그대로
   const command = 'claude mcp add --transport stdio --env VAULT_ENV_PASSPHRASE=<파일 비밀번호> keys-kept -- npx -y keys-kept mcp';
   await expect(ai).toContainText(command);
-  await expect(ai).toContainText('/plugin marketplace add jwn7/keys-kept');
+  await expect(ai).toContainText('/plugin marketplace add keys-kept/keys-kept');
   await expect(ai).toContainText('/plugin install keys-kept@keys-kept');
   await expect(ai).toContainText('AI가 받지 않는 것');
   await ai.getByRole('button', { name: '명령 복사' }).click();

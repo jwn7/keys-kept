@@ -3,7 +3,7 @@
 Lets Claude Code use API keys from your encrypted vault **by name only**. Claude never sees the values and never asks you to paste them.
 
 ```
-/plugin marketplace add jwn7/keys-kept
+/plugin marketplace add keys-kept/keys-kept
 /plugin install keys-kept@keys-kept
 ```
 

@@ -15,12 +15,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jwn7/keys-kept.git",
+    "url": "git+https://github.com/keys-kept/keys-kept.git",
     "directory": "packages/env"
   },
-  "homepage": "https://github.com/jwn7/keys-kept/tree/main/packages/env#readme",
+  "homepage": "https://github.com/keys-kept/keys-kept/tree/main/packages/env#readme",
   "bugs": {
-    "url": "https://github.com/jwn7/keys-kept/issues"
+    "url": "https://github.com/keys-kept/keys-kept/issues"
   },
   "type": "module",
   "engines": {
